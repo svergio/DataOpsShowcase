@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Airflow / Spark / logs
+logs/
+*.log
+airflow-webserver.pid
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets*.yaml
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Data and local artifacts
+tmp/
+temp/
+*.parquet
+*.csv
+*.sqlite
