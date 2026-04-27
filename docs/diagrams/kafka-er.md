@@ -1,7 +1,10 @@
-# Kafka Topic Model (Mermaid)
+# Kafka: топики и сущности (Mermaid)
 
-Топики, в которые пишет `data_generator`, и связанные с ними сущности.
-Имена и партиционирование задаются через `.env`.
+**Зачем:** увидеть, какие **потоки событий** питают ingestion, и как сущности связаны на уровне **логики** (не низкоуровневого протокола).
+
+**Генератор** пишет в топики, имена по умолчанию задаются в [generators/common/config.py](../../generators/common/config.py) и в `.env` (например `KAFKA_TOPIC_ORDERS`, `KAFKA_BOOTSTRAP_SERVERS`).
+
+**См. также:** [../Generators.md](../Generators.md), [../PIPELINES.md](../PIPELINES.md) (ingestion DAG).
 
 ```mermaid
 erDiagram

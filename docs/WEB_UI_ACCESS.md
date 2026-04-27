@@ -1,170 +1,99 @@
-# Web UI Access
+# Доступ к веб-интерфейсам
 
-## 1. Overview
+Проект открывает несколько веб-UI через **единый nginx ingress** (см. [API.md](API.md) и `infra/ingress/nginx.conf`).
 
-Проект публикует несколько web-интерфейсов через единый nginx ingress.
+## Базовый URL
 
-Базовая точка входа:
+```text
+http://localhost:${INGRESS_PORT}
+```
 
-- `http://localhost:${INGRESS_PORT}`
-- Текущее значение в `.env`: `INGRESS_PORT=8090`
+Типичное значение: `INGRESS_PORT=8090` в `.env`. Все пути ниже **относительны** этой базы, если не указано иное.
 
----
+## Список интерфейсов
 
-## 2. Web Interfaces
+### dbt-web (Flask)
 
-### dbt Web UI
+| Параметр | Значение |
+|----------|----------|
+| **URL** | `http://localhost:${INGRESS_PORT}/dbt-web/` |
+| **Назначение** | Просмотр runs, моделей, тестов, docs, **lineage** (D3), артефакты |
+| **Вход** | Сессия: `http://localhost:${INGRESS_PORT}/dbt-web/login` — логин/пароль по умолчанию из `DBT_WEB_AUTH_USER` / `DBT_WEB_AUTH_PASSWORD` (часто `admin` / `admin`) |
 
-URL:
+**Важно:** отдельного контейнера «React-фронтенд» в compose **нет** — одно Flask-приложение (Jinja + статика).
 
-- `http://localhost:${INGRESS_PORT}/dbt-web/`
+### Airflow
 
-Назначение:
+| Параметр | Значение |
+|----------|----------|
+| **URL** | `.../airflow/` |
+| **Назначение** | Мониторинг DAG, ручной запуск, логи задач |
+| **Учётка** | `AIRFLOW_ADMIN_USER` / `AIRFLOW_ADMIN_PASSWORD` из `.env` |
 
-- просмотр dbt запусков;
-- lineage;
-- модели;
-- тесты;
-- docs.
+### MLflow
 
-Credentials:
-
-- No authentication required.
-
----
-
-### Airflow UI
-
-URL:
-
-- `http://localhost:${INGRESS_PORT}/airflow/`
-
-Назначение:
-
-- мониторинг DAG;
-- ручные запуски;
-- просмотр task logs.
-
-Credentials:
-
-- username: `${AIRFLOW_ADMIN_USER}` (в `.env` сейчас `admin`)
-- password: `${AIRFLOW_ADMIN_PASSWORD}` (в `.env` сейчас `admin`)
-
----
-
-### MLflow UI
-
-URL:
-
-- `http://localhost:${INGRESS_PORT}/mlflow/`
-
-Назначение:
-
-- эксперименты;
-- модели;
-- метрики обучения.
-
-Credentials:
-
-- No authentication required.
-
----
+| Параметр | Значение |
+|----------|----------|
+| **URL** | `.../mlflow/` |
+| **Назначение** | Эксперименты, метрики, артефакты моделей |
+| **Auth** | В учебном стенде обычно **без** обязательной аутентификации (см. `docker-compose`) |
 
 ### Grafana
 
-URL:
+| Параметр | Значение |
+|----------|----------|
+| **URL** | `.../grafana/` |
+| **Назначение** | Дашборды, метрики, лаги (по настройке) |
+| **Учётка** | `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` |
 
-- `http://localhost:${INGRESS_PORT}/grafana/`
+### API dbt-web за ingress (тот же backend)
 
-Назначение:
+- База для проверок: `http://localhost:${INGRESS_PORT}/dbt-api/v1/`
+- Пример: `.../dbt-api/v1/health`
 
-- monitoring dashboards;
-- pipeline metrics;
-- лаги и эксплуатационные метрики.
+Список эндпоинтов: [API.md](API.md). Токен для **отдельного** dbt REST (сервис `dbt-rest`), если используется: `DBT_REST_TOKEN` в `.env`.
 
-Credentials:
+## Где лежат учётки и порты
 
-- username: `${GRAFANA_ADMIN_USER}` (в `.env` сейчас `admin`)
-- password: `${GRAFANA_ADMIN_PASSWORD}` (в `.env` сейчас `admin`)
+| Файл / источник | Что внутри |
+|-----------------|------------|
+| `.env` | Рабочие значения для локали |
+| `.env.example` | Шаблон |
+| `docker-compose.yml` | Проброс `ENV` в контейнеры |
+| `infra/monitoring/grafana/provisioning/*` | Provisioning Grafana (учётка из env) |
 
----
+Сопоставление:
 
-### dbt REST / API (browser/debug)
+- Airflow: `AIRFLOW_ADMIN_*`
+- Grafana: `GRAFANA_ADMIN_*`
+- dbt-web сессия: `DBT_WEB_AUTH_*` (и секрет `DBT_WEB_SECRET_KEY` в backend)
 
-URL:
+## Быстрый старт в браузере
 
-- `http://localhost:${INGRESS_PORT}/dbt-api/v1/`
+```text
+http://localhost:8090/dbt-web/
+http://localhost:8090/airflow/
+http://localhost:8090/mlflow/
+http://localhost:8090/grafana/
+http://localhost:8090/dbt-api/v1/health
+```
 
-Назначение:
+(замените `8090` на ваш `INGRESS_PORT`).
 
-- debug API;
-- проверка endpoint'ов и состояния runs.
+## Прямой порт dbt-web (без nginx)
 
-Auth:
+- С хоста: `http://localhost:${DBT_WEB_BACKEND_PORT}` (часто `8010` → `http://localhost:8010/dbt-web/`)
 
-- token: `${DBT_REST_TOKEN}` (берется из `.env`; по умолчанию пустой).
+## Типовые неполадки
 
----
+| Симптом | Что проверить |
+|--------|----------------|
+| **404** | Запущен ли `ingress`, совпадает ли путь с `nginx.conf` (`docker compose ps`) |
+| **502** | Целевой сервис down или unhealthy; `docker compose ps`, логи |
+| **Cannot login** | Значения в `.env` для Airflow/Grafana/dbt-web; после смены — `docker compose up -d --force-recreate <сервис>` |
+| **401/403** на API | Токен `DBT_REST_TOKEN` (если требуется) для dbt REST, не путать с сессией dbt-web |
 
-## 3. Where Credentials Are Stored
+## См. также
 
-Основные файлы:
-
-- `.env` — рабочие значения для локального запуска;
-- `.env.example` — шаблон переменных;
-- `docker-compose.yml` — где эти переменные прокидываются в контейнеры;
-- `services/airflow/config/airflow.cfg` — конфиг Airflow (без логина/пароля админа; они создаются через env в `docker-compose.yml`);
-- `infra/monitoring/grafana/provisioning/*` — provisioning Grafana (логин/пароль берутся из env в `docker-compose.yml`).
-
-Связка переменных и сервисов:
-
-- Airflow UI: `AIRFLOW_ADMIN_USER`, `AIRFLOW_ADMIN_PASSWORD`
-- Grafana UI: `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD`
-- dbt REST API token: `DBT_REST_TOKEN`
-- dbt-web webhook/API token (если включен): `DBT_WEB_TOKEN`
-
----
-
-## 4. Environment Variables (Important)
-
-- `INGRESS_PORT` — внешний порт ingress (`http://localhost:${INGRESS_PORT}`).
-- `AIRFLOW_ADMIN_USER` — логин администратора Airflow.
-- `AIRFLOW_ADMIN_PASSWORD` — пароль администратора Airflow.
-- `GRAFANA_ADMIN_USER` — логин администратора Grafana.
-- `GRAFANA_ADMIN_PASSWORD` — пароль администратора Grafana.
-- `DBT_REST_TOKEN` — токен для dbt REST API (если включена проверка токена).
-
-Примечание:
-
-- В текущем `docker-compose.yml` используются переменные `AIRFLOW_ADMIN_USER`, `AIRFLOW_ADMIN_PASSWORD`, `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD`.
-
----
-
-## 5. Quick Start
-
-### Open everything in browser
-
-- dbt-web -> `http://localhost:${INGRESS_PORT}/dbt-web/`
-- airflow -> `http://localhost:${INGRESS_PORT}/airflow/`
-- mlflow -> `http://localhost:${INGRESS_PORT}/mlflow/`
-- grafana -> `http://localhost:${INGRESS_PORT}/grafana/`
-- dbt api -> `http://localhost:${INGRESS_PORT}/dbt-api/v1/health`
-
----
-
-## 6. Troubleshooting
-
-- **404**
-  - ingress не запущен или маршрут отсутствует в `infra/ingress/nginx.conf`.
-  - Проверка: `docker compose ps ingress`.
-
-- **502**
-  - целевой сервис не поднят или unhealthy.
-  - Проверка: `docker compose ps`.
-
-- **Cannot login**
-  - неверные значения в `.env` для `AIRFLOW_ADMIN_*` или `GRAFANA_ADMIN_*`.
-  - после смены переменных нужно пересоздать сервисы (`docker compose up -d --force-recreate ...`).
-
-- **API 401/403**
-  - неверный `DBT_REST_TOKEN` или отсутствует заголовок авторизации.
+- [SETUP.md](SETUP.md) — первый запуск
+- [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) — зачем стенд

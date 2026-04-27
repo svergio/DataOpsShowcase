@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Lineage | dbt-web{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/lineage.css') }}">
+{% endblock %}
+{% block body %}
+<main>
+  <h1 class="page-title">Lineage graph</h1>
+  <p class="page-lead">Manifest dependencies. API filters re-fetch; layout options are client-side only.</p>
+  <div class="card">
+    <div class="toolbar" id="lineage-filters">
+      <input class="input" type="text" id="f-resource" placeholder="resource_type" size="12" title="Filter by resource type (API)">
+      <input class="input" type="text" id="f-schema" placeholder="schema" size="12" title="Filter by schema (API)">
+      <input class="input" type="text" id="f-tag" placeholder="tag" size="10" title="Filter by tag (API)">
+      <div class="btn-group" id="lineage-mode" role="group" aria-label="Layout">
+        <button type="button" class="btn active" data-mode="force">Force</button>
+        <button type="button" class="btn" data-mode="arc">Arc</button>
+      </div>
+      <label class="inline-check" title="Remove test nodes and incident edges in the view">
+        <input type="checkbox" id="lineage-hide-tests" checked>
+        Hide tests
+      </label>
+      <input class="input" type="search" id="lineage-search" placeholder="Node id or name" size="18" style="min-width: 200px">
+      <button type="button" class="btn" id="lineage-go">Focus</button>
+      <button type="button" class="btn" id="lineage-reset">Reset view</button>
+      <span class="muted" id="lineage-count" style="align-self: center; margin-left: auto">nodes=0 edges=0</span>
+    </div>
+    <p id="lineage-error" class="err"></p>
+    <p id="lineage-loading" class="muted">Loading lineage…</p>
+    <div class="lineage-graph-host" id="lineage-wrap">
+      <svg id="lineage-svg" aria-label="Lineage graph"></svg>
+    </div>
+    <h2 class="page-title" style="font-size: 1rem; margin-top: 16px; margin-bottom: 8px">Selection</h2>
+    <pre class="raw" id="lineage-detail" style="max-height: 32vh; margin: 0"></pre>
+  </div>
+  <div id="tooltip" class="lineage-tooltip" role="status" aria-live="polite"></div>
+</main>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/vendor/d3.v7.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/lineage.js') }}"></script>
+{% endblock %}

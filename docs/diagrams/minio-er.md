@@ -1,7 +1,10 @@
-# MinIO Object Layout (Mermaid)
+# MinIO: структура объектов (Mermaid)
 
-Bucket `${MINIO_BUCKET_RAW}` (по умолчанию `techmart-data`) содержит партиционированные
-объекты, генерируемые `data_generator` по графику `GENERATOR_MINIO_BATCH_TICKS`.
+**Зачем:** понять, как **файловый сырой слой** устроен в bucket (S3-совместимый API), до того как Airflow/Spark заберут данные в БД.
+
+**Bucket** `MINIO_BUCKET_RAW` (часто `techmart-data`) и **префиксы** задаются в [generators/common/config.py](../../generators/common/config.py). Периодическая выгрузка в объекты зависит от `GENERATOR_MINIO_BATCH_TICKS` и логики [generators/generator.py](../../generators/generator.py).
+
+**См. также:** [../Generators.md](../Generators.md).
 
 ```mermaid
 erDiagram

@@ -1,23 +1,21 @@
-# ER-диаграммы TechMart Data Platform
+# Диаграммы (Mermaid)
 
-В этой папке хранятся ER-диаграммы для трёх источников данных, заполняемых
-сервисом `data_generator`.
+Схемы в формате **Mermaid** (рендер в GitHub, GitLab, VS Code / Cursor). SQL-DDL **не** дублируется здесь целиком: для OLTP — [services/postgres/init/02_oltp_schema.sql](../../services/postgres/init/02_oltp_schema.sql), для **схем DWH** — [dwh-schemas.md](dwh-schemas.md) + [dbt/dbt_project.yml](../../dbt/dbt_project.yml).
 
-| Источник | Mermaid | DBML |
-|----------|---------|------|
-| OLTP PostgreSQL (`postgres_oltp`) | [`oltp-er.md`](./oltp-er.md) | [`oltp-er.dbml`](./oltp-er.dbml) |
-| MinIO bucket `techmart-data` | [`minio-er.md`](./minio-er.md) | [`minio-er.dbml`](./minio-er.dbml) |
-| Kafka топики `techmart.*` | [`kafka-er.md`](./kafka-er.md) | [`kafka-er.dbml`](./kafka-er.dbml) |
+## Список
 
-## Как смотреть
+| Тема | Файл |
+|------|------|
+| **DWH: схемы PostgreSQL** (staging, vault, marts, meta) | [dwh-schemas.md](dwh-schemas.md) |
+| Поток Data Vault / dbt (слой за слоем) | [data_vault_flow.md](data_vault_flow.md) |
+| OLTP (источник) | [oltp-er.md](oltp-er.md) |
+| Kafka (топики) | [kafka-er.md](kafka-er.md) |
+| MinIO (bucket) | [minio-er.md](minio-er.md) |
 
-- **Mermaid (`.md`)** — рендерится на GitHub и в большинстве IDE
-  (включая VS Code/Cursor с расширениями). Откройте Markdown preview.
-- **DBML (`.dbml`)** — открывайте на [dbdiagram.io](https://dbdiagram.io/) или
-  через CLI `dbml-cli` (например `dbml2sql oltp-er.dbml`).
+**DBML-файлы** в репозитории не ведутся; при необходимости схему можно перенести в [dbdiagram.io](https://dbdiagram.io/) вручную.
 
-## Связь с генератором
+## См. также
 
-`generators/generator.py` поддерживает идентичные имена сущностей
-и совместимые поля. Имена Kafka-топиков и MinIO-префиксов задаются через
-переменные `.env` и должны совпадать с диаграммами.
+- [../PROJECT_SUMMARY.md](../PROJECT_SUMMARY.md) — обзор платформы
+- [../ARCHITECTURE.md](../ARCHITECTURE.md) — структура репо
+- [../PIPELINES.md](../PIPELINES.md) — что пишет Airflow/Spark **до** dbt

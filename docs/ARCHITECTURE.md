@@ -1,31 +1,51 @@
-# Архитектура
+# Архитектура DataOpsShowcase
 
-## Структура репозитория (монорепозиторий)
+Проект — **монорепозиторий** с едиными соглашениями по путям, конфигам и документации. Ниже — роли каталогов и как компоненты сходятся в рантайме (Docker Compose).
+
+## Структура репозитория
 
 | Путь | Роль |
-| --- | --- |
-| `pipelines/` | Airflow DAG, plugins, datasets |
-| `services/` | Общие Python-библиотеки: storage, Kafka, dbt client, логирование/метрики, конфиги сервисов |
-| `services/dbt_web/` | UI для dbt-документации (FastAPI backend + React frontend) |
+|------|------|
+| `pipelines/` | Airflow: DAG, плагины, `datasets` |
+| `services/` | Общий Python: хранилища, Kafka, логи, метрики; **dbt-web** — веб-UI |
+| `services/dbt_web/` | **Flask**: JSON API + Jinja-шаблоны + статика (CSS/JS, lineage на D3). Отдельного Node-фронтенда в compose нет. |
 | `spark/jobs/` | Точки входа Spark-задач |
-| `spark/common/` | Общие Spark/JDBC утилиты (`lib_runtime`, `spark_session`) |
-| `ml/training/` | Скрипты обучения моделей (Spark + MLflow) |
-| `ml/configs/`, `ml/features/`, `ml/inference/`, `ml/models/` | ML-конфиги и доменные директории |
-| `generators/` | Генераторы синтетических данных (`common/`, `kafka/`, `generator.py`) |
-| `dbt/` | dbt-проект: `staging/`, `vault/`, `marts/`, `serving/`, tests, macros |
-| `configs/` | YAML-конфигурации пайплайнов, Airflow, Spark |
-| `infra/` | Docker init SQL, мониторинг (Prometheus, Grafana) |
-| `scripts/` | Вспомогательные CLI-скрипты |
-| `tests/` | Pytest тесты |
+| `spark/common/` | Утилиты (`lib_runtime`, `spark_session`), подключаются в job как `py_files` |
+| `ml/training/` | Скрипты обучения (например, `train_order_value_model.py`) |
+| `ml/configs/`, `ml/features/`, `ml/inference/`, `ml/models/` | ML-конфиги, фичи, вывод, артефакты |
+| `generators/` | Синтетика: `generator.py`, `kafka/`, `common/` |
+| `dbt/` | dbt: `models/` (staging, vault, marts, serving), тесты, макросы |
+| `configs/` | YAML: пайплайны, Airflow, Spark |
+| `infra/` | Init SQL, ingress (nginx), Grafana/Prometheus |
+| `scripts/` | Вспомогательные CLI |
+| `tests/` | Pytest |
 
-## Интеграция в рантайме
+Сводка назначения платформы: [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md).
 
-- `docker-compose.yml` поднимает PostgreSQL (OLTP/OLAP/meta), Kafka, MinIO, Spark, Airflow, MLflow, dbt-web, Prometheus.
-- Airflow монтирует `pipelines/`, `services/`, `spark/`, `ml/`, `generators/`, `configs/`, `dbt/`.
-- Spark workers монтируют `spark/jobs` и `spark/conf`.
-- SparkSubmit получает `lib_runtime.py` и `spark_session.py` через `py_files`.
-- Наблюдаемость реализована через структурные JSON-логи и метрики Prometheus.
+## Интеграция в рантайме (Docker)
 
-## Поток данных (упрощённо)
+- `docker compose` поднимает, среди прочего: PostgreSQL (роли OLTP/OLAP/meta), Kafka, MinIO, Spark, Airflow, MLflow, **dbt-web**, Prometheus, **ingress (nginx)**.
+- В **Airflow** смонтированы `pipelines/`, `services/`, `spark/`, `ml/`, `generators/`, `configs/`, `dbt/`.
+- **Spark** workers получают `spark/jobs` и `spark/conf`; `py_files` — общий runtime из `spark/common/`.
+- **dbt-web** обслуживает UI по префиксу `/dbt-web` и API `/api/v1` за ingress (см. [WEB_UI_ACCESS.md](WEB_UI_ACCESS.md), [API.md](API.md)).
+- **Наблюдаемость**: JSON-логи, метрики Prometheus, дашборды Grafana (см. `infra/monitoring`).
 
-OLTP/Kafka/MinIO -> **raw** -> Spark препроцессинг -> **staging** -> Data Vault/dbt -> **marts** -> **serving**. ML-обучение читает подготовленные слои (предпочтительно marts).
+## Поток данных (логически)
+
+```text
+OLTP, Kafka, MinIO
+    -> ingestion (Airflow)
+    -> raw / landing в БД
+    -> Spark: препроцессинг -> staging
+    -> загрузка Data Vault (hubs, links) -> SCD2 в satellites
+    -> dbt: staging (views) + vault + marts + serving
+    -> data quality, serving-оптимизации
+    -> ML-обучение (Spark) -> MLflow
+```
+
+Схемы: [diagrams/dwh-schemas.md](diagrams/dwh-schemas.md) (схемы БД), [diagrams/data_vault_flow.md](diagrams/data_vault_flow.md) (поток DV). Фактическая цепочка DAG: [PIPELINES.md](PIPELINES.md).
+
+## См. также
+
+- [SETUP.md](SETUP.md) — запуск
+- [Generators.md](Generators.md) — источники данных

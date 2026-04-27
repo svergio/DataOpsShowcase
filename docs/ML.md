@@ -1,25 +1,38 @@
-# ML-пайплайны
+# ML в DataOpsShowcase
 
-## Структура
+Раздел описывает **каталог `ml/`**, связь с **Airflow** и **MLflow**, а не математику конкретных моделей.
 
-| Путь | Назначение |
-| --- | --- |
-| `ml/training/` | Скрипты обучения (например, `train_order_value_model.py`) |
-| `ml/configs/training_default.yaml` | Дефолтные гиперпараметры/метаданные эксперимента |
+## Назначение каталогов
+
+| Путь | Содержание |
+|------|------------|
+| `ml/training/` | Скрипты обучения (пример: `train_order_value_model.py`) |
+| `ml/configs/training_default.yaml` | Параметры/метаданные эксперимента по умолчанию |
 | `ml/features/` | Код подготовки признаков |
-| `ml/inference/` | Batch/online inference обвязка |
-| `ml/models/` | Метаданные/артефакты моделей |
+| `ml/inference/` | Обертки batch/online-инференса |
+| `ml/models/` | Метаданные и пути к артефактам (по соглашениям проекта) |
 
-## Airflow
+## Оркестрация
 
-- DAG `dag_ml_train_spark` запускает обучение в Spark.
-- Путь приложения в контейнере: `/opt/airflow/ml/training/train_order_value_model.py`.
-- Общие Spark-утилиты поставляются из `spark/common/` через `py_files`.
+- DAG `dag_ml_train_spark` (см. [PIPELINES.md](PIPELINES.md)) поднимает обучение в **Spark**; приложение в контейнере — путь вроде `/opt/airflow/ml/training/... .py` (актуальное имя в DAG).
+- Общий Spark-рантайм поставляется из `spark/common/` через `py_files`.
 
-## Источники данных
+## Данные
 
-Обучение использует `dwh_staging.stg_orders` (с fallback для bootstrap окружений). Для production рекомендуется явный переход на curated/marts источники.
+- Для стенда обучение может читать из `dwh_staging` (например, `stg_orders`); в прод-подобных сценариях источник переносят на **marts/curated** после согласования.
 
-## MLflow и артефакты
+## MLflow
 
-Tracking URI, имя эксперимента и модели берутся из переменных окружения (`docker-compose.yml`, DAG `dag_ml_train_spark`).
+- **Tracking URI** и имя эксперимента задаются переменными окружения (см. `docker-compose`, переменные в DAG `dag_ml_train_spark`).
+- UI MLflow: через ingress, см. [WEB_UI_ACCESS.md](WEB_UI_ACCESS.md).
+
+## Минимальный ручной чек-лист
+
+1. Поднять стек и Airflow, убедиться, что `dag_ml_train_spark` виден.
+2. Проверить, что в MLflow появляется эксперимент с метриками после прогона.
+3. Сверить путь к данным в скрипте с актуальными схемами dbt (см. [diagrams/data_vault_flow.md](diagrams/data_vault_flow.md)).
+
+## См. также
+
+- [ARCHITECTURE.md](ARCHITECTURE.md) — как `ml/` встраивается в монорепо
+- [Roadmap.md](Roadmap.md) — приоритеты по ML-задачам (P1/P2)

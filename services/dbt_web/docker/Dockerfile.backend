@@ -6,8 +6,10 @@ COPY backend/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
 COPY backend/app /app/app
+COPY backend/templates /app/templates
+COPY backend/static /app/static
 COPY backend/tests /app/tests
 
 EXPOSE 8010
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8010"]
+CMD ["gunicorn", "-b", "0.0.0.0:8010", "-w", "1", "app.main:app"]

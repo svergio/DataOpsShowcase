@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from fastapi import HTTPException
-
 
 class DbtWebError(Exception):
     def __init__(self, error_code: str, message: str, *, upstream_status: int | None = None, details: dict | None = None) -> None:
@@ -12,7 +10,8 @@ class DbtWebError(Exception):
         self.details = details or {}
 
 
-def as_http_error(exc: DbtWebError, trace_id: str) -> HTTPException:
+def error_payload(exc: DbtWebError, trace_id: str) -> tuple[int, dict]:
+    status_code = 502 if exc.upstream_status else 400
     payload = {
         "error_code": exc.error_code,
         "message": exc.message,
@@ -20,5 +19,4 @@ def as_http_error(exc: DbtWebError, trace_id: str) -> HTTPException:
         "upstream_status": exc.upstream_status,
         "trace_id": trace_id,
     }
-    status_code = 502 if exc.upstream_status else 400
-    return HTTPException(status_code=status_code, detail=payload)
+    return status_code, payload

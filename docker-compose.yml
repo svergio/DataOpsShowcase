@@ -383,6 +383,9 @@ services:
     restart: unless-stopped
     environment:
       DBT_WEB_PORT: 8010
+      DBT_WEB_SECRET_KEY: ${DBT_WEB_SECRET_KEY:-dev-dbt-web-secret}
+      DBT_WEB_AUTH_USER: ${DBT_WEB_AUTH_USER:-admin}
+      DBT_WEB_AUTH_PASSWORD: ${DBT_WEB_AUTH_PASSWORD:-admin}
       DBT_REST_BASE_URL: ${DBT_REST_BASE_URL:-http://dbt-rest:8580}
       DBT_REST_TOKEN: ${DBT_REST_TOKEN:-}
       DBT_WEB_STORAGE_ENDPOINT: ${DBT_WEB_STORAGE_ENDPOINT:-http://minio:9000}
@@ -402,28 +405,6 @@ services:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8010/api/v1/health')\""]
       interval: 20s
       timeout: 10s
-      retries: 10
-    networks:
-      - dataops_net
-
-  dbt_web_frontend:
-    build:
-      context: ./services/dbt_web
-      dockerfile: docker/Dockerfile.frontend
-    image: dataops/dbt-web-frontend:local
-    container_name: dbt-web-frontend
-    restart: unless-stopped
-    environment:
-      DBT_WEB_BACKEND_URL: http://dbt-web-backend:8010
-    ports:
-      - "${DBT_WEB_FRONTEND_PORT:-8011}:80"
-    depends_on:
-      dbt_web_backend:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:80/ || exit 1"]
-      interval: 20s
-      timeout: 5s
       retries: 10
     networks:
       - dataops_net
@@ -645,8 +626,6 @@ services:
       airflow_webserver:
         condition: service_healthy
       dbt_web_backend:
-        condition: service_healthy
-      dbt_web_frontend:
         condition: service_healthy
       mlflow:
         condition: service_healthy

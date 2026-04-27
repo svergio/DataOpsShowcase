@@ -1,6 +1,8 @@
-# DataOps Showcase: source-oriented DAG
+# Airflow: DAG и цепочка данных
 
-Этот документ описывает production-реализацию из 13 Airflow DAG, связанных через Datasets. Цепочка включает ingestion, Spark-препроцессинг, загрузку Data Vault, SCD2, dbt REST слои, data quality, serving и ML-обучение в Spark с логированием в MLflow.
+В проекте **13** Airflow DAG, связанных через **Datasets** (события вместо жёсткого `ExternalTaskSensor` там, где настроено). Цепочка: ingestion, Spark-препроцессинг, загрузка **Data Vault**, SCD2, слои **dbt** (через dbt REST), data quality, serving и обучение в Spark с **MLflow**.
+
+Сводка стека и бизнес-образ: [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md). Схема dbt: [diagrams/data_vault_flow.md](diagrams/data_vault_flow.md).
 
 ## Архитектура верхнего уровня
 

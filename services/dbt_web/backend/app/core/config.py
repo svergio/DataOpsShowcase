@@ -26,5 +26,12 @@ class Settings(BaseSettings):
         alias="DBT_WEB_DB_DSN",
     )
 
+    dbt_web_secret_key: str = Field(
+        default="dev-db-web-secret-change-in-prod",
+        alias="DBT_WEB_SECRET_KEY",
+    )
+    dbt_web_auth_user: str = Field(default="admin", alias="DBT_WEB_AUTH_USER")
+    dbt_web_auth_password: str = Field(default="admin", alias="DBT_WEB_AUTH_PASSWORD")
+
 
 settings = Settings()

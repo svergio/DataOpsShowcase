@@ -1,7 +1,10 @@
-# OLTP ER Diagram (Mermaid)
+# OLTP: ER-диаграмма (PostgreSQL, Mermaid)
 
-Source: `services/postgres/init/02_oltp_schema.sql` (фактическая схема контейнера `postgres_oltp`).
-Соответствует ему генератор `generators/generator.py`.
+**Зачем:** быстро понять сущности маркетплейса TechMart в транзакционной БД.
+
+**Источник правды по DDL:** [services/postgres/init/02_oltp_schema.sql](../../services/postgres/init/02_oltp_schema.sql) (схема в контейнере `postgres_oltp`).
+
+**Генератор:** вставки согласованы с [generators/generator.py](../../generators/generator.py) и [../Generators.md](../Generators.md).
 
 ```mermaid
 erDiagram

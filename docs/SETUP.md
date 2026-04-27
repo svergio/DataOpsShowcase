@@ -1,44 +1,43 @@
-# Настройка
+# Настройка и запуск
 
 ## Требования
 
-- Docker и Docker Compose
-- Python 3.11+
-- (Опционально) Node.js 20+ для пересборки `services/dbt_web/frontend`
+- **Docker** и **Docker Compose** (V2, команда `docker compose`).
+- **Python 3.11+** — для локальных тестов Python-сервисов (например, `services/dbt_web/backend`).
 
-## Окружение
+## Первый запуск
 
-1. Скопируйте `.env.example` в `.env` и заполните значения.
-2. Из корня репозитория (`DataOpsShowcase/`) запустите стек:
-   - `docker compose up -d`
+1. Скопируйте шаблон окружения:
 
-## Ingress (единая точка входа)
+   ```bash
+   cp .env.example .env
+   ```
 
-После запуска доступен nginx ingress:
+2. При необходимости поправьте порты в `.env` (см. `INGRESS_PORT`, `DBT_WEB_BACKEND_PORT`).
 
-- URL: `http://localhost:8090` (или `${INGRESS_PORT}` из `.env`)
-- Маршруты:
-  - `http://localhost:8090/dbt-web/`
-  - `http://localhost:8090/dbt-api/v1/health`
-  - `http://localhost:8090/airflow/`
-  - `http://localhost:8090/mlflow/`
-  - `http://localhost:8090/grafana/`
+3. Из корня репозитория `DataOpsShowcase/`:
 
-Подробная памятка по URL и credentials:
+   ```bash
+   docker compose up -d
+   ```
 
-- [Web UI Access -> WEB_UI_ACCESS.md](WEB_UI_ACCESS.md)
+4. Откройте **ingress** (по умолчанию `http://localhost:8090`) и проверьте маршруты из [WEB_UI_ACCESS.md](WEB_UI_ACCESS.md).
+
+## Ingress
+
+Nginx публикует единую точку входа: dbt-web, Airflow, MLflow, Grafana, проксирование API. Конфиг: [infra/ingress/nginx.conf](../infra/ingress/nginx.conf).
 
 ## Airflow
 
-- DAG: `pipelines/dags/`
-- Connections: `configs/airflow/connections.json` (импорт в `airflow_init`)
+- DAG: [pipelines/dags/](../pipelines/dags/)
+- Подключения: [configs/airflow/](../configs/airflow/) (см. инициализацию `airflow_init` в compose)
 
 ## dbt
 
-- Проект: `dbt/`
-- Профили: `dbt/profiles.yml` (`DBT_PROFILES_DIR`)
+- Проект: [dbt/](../dbt/)
+- Профили: `dbt/profiles.yml`, каталог `DBT_PROFILES_DIR` (см. compose)
 
-## Локальные тесты
+## Локальные тесты (Python)
 
 ```bash
 cd DataOpsShowcase
@@ -46,7 +45,26 @@ pip install -r requirements/dev.txt
 pytest tests/unit
 ```
 
-## CI
+Тесты **dbt-web** backend (без отдельного Node-сборщика в CI):
 
-- `.github/workflows/dbt-docs.yml` — dbt parse/compile/docs + публикация артефактов.
-- `.github/workflows/dbt-web.yml` — проверки backend/frontend dbt-web.
+```bash
+cd services/dbt_web/backend
+pip install -r requirements.txt
+pytest -q
+```
+
+## CI (GitHub Actions)
+
+- `.github/workflows/dbt-docs.yml` — `dbt parse` / `compile` / `docs` и публикация артефактов
+- `.github/workflows/dbt-web.yml` — проверки **backend** `services/dbt_web`
+
+## Когда что-то не взводится
+
+1. `docker compose ps` — поднят ли `ingress` и целевой сервис.
+2. Логи: `docker compose logs <сервис> --tail=100`
+3. Разбор типичных 404/502/логинов: [WEB_UI_ACCESS.md](WEB_UI_ACCESS.md)
+
+## См. также
+
+- [API.md](API.md) — URL API
+- [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) — обзор стенда
