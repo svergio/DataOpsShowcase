@@ -1,0 +1,3 @@
+CREATE DATABASE airflow;
+CREATE DATABASE superset;
+CREATE DATABASE mlflow;

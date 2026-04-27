@@ -1,0 +1,50 @@
+{
+  "postgres_oltp": {
+    "conn_type": "postgres",
+    "host": "postgres_oltp",
+    "schema": "techmart_oltp",
+    "login": "oltp_user",
+    "password": "oltp_pass",
+    "port": 5432
+  },
+  "postgres_olap": {
+    "conn_type": "postgres",
+    "host": "postgres_olap",
+    "schema": "techmart_dwh",
+    "login": "olap_user",
+    "password": "olap_pass",
+    "port": 5432
+  },
+  "postgres_dwh": {
+    "conn_type": "postgres",
+    "host": "postgres_olap",
+    "schema": "techmart_dwh",
+    "login": "olap_user",
+    "password": "olap_pass",
+    "port": 5432
+  },
+  "postgres_meta": {
+    "conn_type": "postgres",
+    "host": "postgres_metadb",
+    "schema": "metadb",
+    "login": "meta_user",
+    "password": "meta_pass",
+    "port": 5432
+  },
+  "spark_default": {
+    "conn_type": "spark",
+    "host": "spark://spark-master",
+    "port": 7077,
+    "extra": {
+      "deploy-mode": "client"
+    }
+  },
+  "minio_default": {
+    "conn_type": "aws",
+    "extra": {
+      "aws_access_key_id": "minio",
+      "aws_secret_access_key": "minio123",
+      "endpoint_url": "http://minio:9000"
+    }
+  }
+}

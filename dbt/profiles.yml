@@ -1,0 +1,15 @@
+dataops_showcase:
+  target: dwh
+  outputs:
+    dwh:
+      type: postgres
+      host: "{{ env_var('DBT_HOST', 'postgres_olap') }}"
+      port: "{{ env_var('DBT_PORT', '5432') | int }}"
+      user: "{{ env_var('DBT_USER', 'olap_user') }}"
+      password: "{{ env_var('DBT_PASSWORD', 'olap_pass') }}"
+      dbname: "{{ env_var('DBT_DBNAME', 'techmart_dwh') }}"
+      schema: "{{ env_var('DBT_SCHEMA', 'analytics') }}"
+      threads: "{{ env_var('DBT_THREADS', '4') | int }}"
+      keepalives_idle: 0
+      sslmode: prefer
+      search_path: "analytics, dwh_marts, dwh_bdv, dwh_vault, dwh_staging, dwh_serving, marts, vault, staging, raw, public"

@@ -1,0 +1,38 @@
+version: 1
+
+raw_kafka_orders:
+  required: [event_id, order_id, event_ts]
+  numeric_non_negative: [total_amount]
+  iso_country: [country_code]
+  iso_currency: [currency]
+  expected_event_types:
+    - order.created
+    - order.updated
+    - order.cancelled
+
+raw_kafka_payments:
+  required: [event_id, payment_id, order_id, event_ts]
+  numeric_non_negative: [amount]
+  iso_currency: [currency]
+  allowed_statuses: [authorized, captured, declined, refunded]
+  allowed_methods: [card, wallet, transfer, cash]
+
+raw_minio_payments:
+  required: [payment_id, order_id, amount, currency, event_ts]
+  numeric_non_negative: [amount]
+  iso_currency: [currency]
+
+stg_customers:
+  required: [customer_id, email, full_name]
+  email_pattern: "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+
+stg_orders:
+  required: [order_id, customer_id, order_ts, status, currency_code, total_amount]
+  numeric_positive: [total_amount]
+  allowed_statuses:
+    - created
+    - paid
+    - shipped
+    - delivered
+    - cancelled
+    - returned

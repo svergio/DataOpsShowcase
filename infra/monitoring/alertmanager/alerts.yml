@@ -1,0 +1,11 @@
+groups:
+  - name: dataops-stack
+    rules:
+      - alert: PrometheusTargetDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus target down"
+          description: "One of the configured scrape targets is unavailable."

@@ -1,0 +1,65 @@
+version: 2
+
+models:
+  - name: mv_customer_360
+    description: "Materialized view: full customer 360 (lifetime + 90d metrics) for BI."
+    config:
+      tags: ['serving', 'customer_360']
+    columns:
+      - name: customer_hub_key
+        tests: [not_null, unique]
+      - name: customer_bk
+        tests: [not_null]
+      - name: customer_segment
+        tests:
+          - accepted_values:
+              values: ['platinum', 'gold', 'silver', 'bronze']
+              config:
+                where: "customer_segment is not null"
+      - name: lifetime_orders
+        tests: [not_null]
+      - name: lifetime_gross
+        tests: [not_null]
+
+  - name: agg_daily_sales
+    description: "Pre-aggregated daily sales with rolling 7d / 30d MAs and WoW growth."
+    config:
+      tags: ['serving', 'pre_aggregation']
+    columns:
+      - name: order_date
+        tests: [not_null]
+      - name: currency
+        tests: [not_null]
+      - name: order_count
+      - name: gross_sales
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: ['order_date', 'currency']
+
+  - name: agg_payment_performance
+    description: "Daily payment performance per method/currency."
+    config:
+      tags: ['serving', 'pre_aggregation']
+    columns:
+      - name: payment_date
+        tests: [not_null]
+      - name: payment_method
+        tests: [not_null]
+      - name: success_rate
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: ['payment_date', 'payment_method', 'currency']
+
+  - name: agg_segment_revenue
+    description: "Daily revenue per customer_segment for segmentation dashboards."
+    config:
+      tags: ['serving', 'pre_aggregation']
+    columns:
+      - name: order_date
+        tests: [not_null]
+      - name: customer_segment
+        tests: [not_null]
+      - name: gross_sales
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: ['order_date', 'customer_segment']

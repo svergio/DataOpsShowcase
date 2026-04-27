@@ -1,0 +1,127 @@
+name: dbt-docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "dbt/**"
+      - ".github/workflows/dbt-docs.yml"
+  workflow_dispatch:
+
+jobs:
+  build_and_publish:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: olap_user
+          POSTGRES_PASSWORD: olap_pass
+          POSTGRES_DB: techmart_dwh
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U olap_user -d techmart_dwh"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      DBT_PROFILES_DIR: ${{ github.workspace }}/dbt
+      DBT_HOST: localhost
+      DBT_PORT: 5432
+      DBT_USER: olap_user
+      DBT_PASSWORD: olap_pass
+      DBT_DBNAME: techmart_dwh
+      DBT_SCHEMA: dwh_marts
+      MINIO_ENDPOINT: ${{ secrets.MINIO_ENDPOINT }}
+      MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY }}
+      MINIO_SECRET_KEY: ${{ secrets.MINIO_SECRET_KEY }}
+      MINIO_BUCKET: ${{ secrets.MINIO_BUCKET || 'dbt-artifacts' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dbt and tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install dbt-postgres==1.8.2 minio==7.2.7 jsonschema==4.23.0
+
+      - name: Wait for postgres
+        run: |
+          for i in {1..30}; do
+            pg_isready -h localhost -p 5432 -U olap_user -d techmart_dwh && break
+            sleep 2
+          done
+
+      - name: dbt deps
+        working-directory: dbt
+        run: dbt deps --no-write-json || true
+
+      - name: dbt source freshness
+        working-directory: dbt
+        run: dbt source freshness --target ci || true
+
+      - name: dbt parse
+        working-directory: dbt
+        run: dbt parse --target ci
+
+      - name: dbt compile
+        working-directory: dbt
+        run: dbt compile --target ci
+
+      - name: dbt docs generate
+        working-directory: dbt
+        run: dbt docs generate --target ci --static
+
+      - name: Validate manifest schema
+        working-directory: dbt
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest = json.loads(Path("target/manifest.json").read_text())
+          assert "nodes" in manifest, "manifest.nodes missing"
+          assert "metadata" in manifest, "manifest.metadata missing"
+          assert manifest.get("metadata", {}).get("dbt_schema_version"), "dbt_schema_version missing"
+          print("manifest.nodes:", len(manifest.get("nodes", {})))
+          PY
+
+      - name: Upload artifacts to GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbt-target
+          path: |
+            dbt/target/manifest.json
+            dbt/target/catalog.json
+            dbt/target/run_results.json
+            dbt/target/static_index.html
+
+      - name: Publish artifacts to MinIO
+        if: env.MINIO_ENDPOINT != ''
+        run: |
+          python scripts/publish_dbt_artifacts.py \
+            --target-dir dbt/target \
+            --bucket "$MINIO_BUCKET" \
+            --prefix "ci/${GITHUB_RUN_ID}" \
+            --latest-prefix "latest-success/marts"
+
+      - name: Notify dbt-web
+        if: env.MINIO_ENDPOINT != '' && success()
+        env:
+          DBT_WEB_BASE_URL: ${{ secrets.DBT_WEB_BASE_URL }}
+          DBT_WEB_TOKEN: ${{ secrets.DBT_WEB_TOKEN }}
+        run: |
+          if [ -z "$DBT_WEB_BASE_URL" ]; then
+            echo "DBT_WEB_BASE_URL not set; skipping webhook"
+            exit 0
+          fi
+          curl -fsS -X POST "$DBT_WEB_BASE_URL/api/v1/events/marts_completed" \
+            -H "Content-Type: application/json" \
+            ${DBT_WEB_TOKEN:+-H "Authorization: Bearer $DBT_WEB_TOKEN"} \
+            -d "{\"event_id\":\"ci-${GITHUB_RUN_ID}\",\"dag_id\":\"ci.dbt_docs\",\"run_id\":\"${GITHUB_RUN_ID}\",\"event_ts\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"target_layer\":\"marts\"}"

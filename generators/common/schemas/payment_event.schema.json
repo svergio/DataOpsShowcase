@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PaymentEvent",
+  "type": "object",
+  "required": [
+    "event_id",
+    "event_type",
+    "payment_id",
+    "order_id",
+    "amount",
+    "currency",
+    "payment_method",
+    "status",
+    "timestamp"
+  ],
+  "properties": {
+    "event_id": {"type": "string"},
+    "event_type": {"type": "string"},
+    "payment_id": {"type": "integer"},
+    "order_id": {"type": "integer"},
+    "transaction_id": {"type": "string"},
+    "amount": {"type": "number"},
+    "currency": {"type": "string"},
+    "payment_method": {
+      "type": "string",
+      "enum": [
+        "CREDIT_CARD",
+        "DEBIT_CARD",
+        "PAYPAL",
+        "STRIPE",
+        "BANK_TRANSFER",
+        "CRYPTO"
+      ]
+    },
+    "gateway": {"type": "string"},
+    "status": {
+      "type": "string",
+      "enum": [
+        "INITIATED",
+        "AUTHORIZED",
+        "CAPTURED",
+        "DECLINED",
+        "FAILED",
+        "REFUNDED"
+      ]
+    },
+    "decline_reason": {"type": ["string", "null"]},
+    "risk_score": {"type": ["integer", "null"]},
+    "timestamp": {"type": "integer"}
+  }
+}

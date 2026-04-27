@@ -1,0 +1,25 @@
+services:
+  dbt-web-backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: dbt_web_backend
+    environment:
+      DBT_WEB_PORT: 8010
+      DBT_REST_BASE_URL: http://dbt-rest:8580
+      DBT_REST_TOKEN: ""
+      DBT_WEB_ARTIFACT_BUCKET: dbt-artifacts
+      DBT_WEB_STORAGE_ENDPOINT: http://minio:9000
+      DBT_WEB_STORAGE_ACCESS_KEY: minio
+      DBT_WEB_STORAGE_SECRET_KEY: minio123
+      DBT_WEB_DB_DSN: postgresql://olap_user:olap_pass@postgres_olap:5432/techmart_dwh
+    ports:
+      - "8010:8010"
+
+  dbt-web-frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    container_name: dbt_web_frontend
+    ports:
+      - "8011:80"

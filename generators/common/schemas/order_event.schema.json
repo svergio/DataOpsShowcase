@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OrderEvent",
+  "type": "object",
+  "required": [
+    "event_id",
+    "event_type",
+    "order_id",
+    "customer_id",
+    "timestamp",
+    "new_status",
+    "total_amount",
+    "currency"
+  ],
+  "properties": {
+    "event_id": {"type": "string"},
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "ORDER_CREATED",
+        "ORDER_CONFIRMED",
+        "ORDER_CANCELLED",
+        "ORDER_SHIPPED",
+        "ORDER_DELIVERED"
+      ]
+    },
+    "order_id": {"type": "integer"},
+    "order_number": {"type": "string"},
+    "customer_id": {"type": "integer"},
+    "country_code": {"type": "string"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "previous_status": {"type": ["string", "null"]},
+    "new_status": {"type": "string"},
+    "total_amount": {"type": "number"},
+    "currency": {"type": "string"},
+    "items_count": {"type": "integer"},
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["product_id", "quantity", "unit_price"],
+        "properties": {
+          "product_id": {"type": "integer"},
+          "sku": {"type": "string"},
+          "quantity": {"type": "integer"},
+          "unit_price": {"type": "number"},
+          "subtotal": {"type": "number"},
+          "category": {"type": "string"}
+        }
+      }
+    },
+    "metadata": {"type": "object"}
+  }
+}

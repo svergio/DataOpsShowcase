@@ -1,0 +1,174 @@
+version: 2
+
+sources:
+  - name: raw
+    database: "{{ env_var('DBT_DBNAME', 'techmart_dwh') }}"
+    schema: raw
+    description: "Raw landing zone populated by Airflow ingestion DAGs."
+    loaded_at_field: ingested_at
+    freshness:
+      warn_after: {count: 30, period: minute}
+      error_after: {count: 90, period: minute}
+    tables:
+      - name: oltp_users
+        description: "Users replicated from OLTP."
+        loaded_at_field: ingested_at
+        freshness:
+          warn_after: {count: 30, period: minute}
+          error_after: {count: 120, period: minute}
+        columns:
+          - name: user_id
+            tests:
+              - not_null:
+                  severity: error
+          - name: email
+            tests:
+              - not_null:
+                  severity: error
+          - name: full_name
+          - name: created_at
+          - name: ingested_at
+            tests:
+              - not_null:
+                  severity: error
+      - name: oltp_sellers
+        loaded_at_field: ingested_at
+        freshness:
+          warn_after: {count: 60, period: minute}
+          error_after: {count: 240, period: minute}
+        columns:
+          - name: seller_id
+            tests:
+              - not_null:
+                  severity: error
+          - name: seller_name
+          - name: rating
+          - name: created_at
+          - name: ingested_at
+      - name: oltp_products
+        loaded_at_field: ingested_at
+        freshness:
+          warn_after: {count: 60, period: minute}
+          error_after: {count: 240, period: minute}
+        columns:
+          - name: product_id
+            tests:
+              - not_null:
+                  severity: error
+          - name: seller_id
+          - name: sku
+          - name: product_name
+          - name: category
+          - name: price
+          - name: is_active
+          - name: created_at
+          - name: ingested_at
+      - name: oltp_orders
+        loaded_at_field: ingested_at
+        freshness:
+          warn_after: {count: 30, period: minute}
+          error_after: {count: 90, period: minute}
+        columns:
+          - name: order_id
+            tests:
+              - not_null:
+                  severity: error
+          - name: user_id
+            tests:
+              - not_null:
+                  severity: error
+          - name: order_ts
+            tests:
+              - not_null:
+                  severity: error
+          - name: status
+          - name: currency_code
+          - name: total_amount
+          - name: ingested_at
+      - name: oltp_order_items
+        loaded_at_field: ingested_at
+        freshness:
+          warn_after: {count: 60, period: minute}
+          error_after: {count: 240, period: minute}
+        columns:
+          - name: order_item_id
+            tests:
+              - not_null:
+                  severity: error
+          - name: order_id
+            tests:
+              - not_null:
+                  severity: error
+          - name: product_id
+            tests:
+              - not_null:
+                  severity: error
+          - name: quantity
+          - name: unit_price
+          - name: ingested_at
+      - name: kafka_orders
+        description: "Kafka order events micro-batches."
+        loaded_at_field: ingested_at
+        freshness:
+          warn_after: {count: 15, period: minute}
+          error_after: {count: 60, period: minute}
+        columns:
+          - name: ingest_uuid
+            tests:
+              - not_null:
+                  severity: error
+              - unique:
+                  severity: error
+          - name: event_id
+          - name: order_id
+          - name: customer_id
+          - name: total_amount
+          - name: event_ts
+          - name: payload
+      - name: kafka_payments
+        description: "Kafka payment transaction events."
+        loaded_at_field: ingested_at
+        freshness:
+          warn_after: {count: 15, period: minute}
+          error_after: {count: 60, period: minute}
+        columns:
+          - name: ingest_uuid
+            tests:
+              - not_null:
+                  severity: error
+              - unique:
+                  severity: error
+          - name: payment_id
+          - name: order_id
+          - name: amount
+          - name: status
+          - name: event_ts
+          - name: payload
+
+  - name: staging_pipeline
+    database: "{{ env_var('DBT_DBNAME', 'techmart_dwh') }}"
+    schema: staging
+    description: "Staging tables produced by ingestion/spark DAGs (consumed as sources)."
+    loaded_at_field: loaded_at
+    freshness:
+      warn_after: {count: 60, period: minute}
+      error_after: {count: 180, period: minute}
+    tables:
+      - name: stg_minio_payments
+        description: "Files-based payment events landed via MinIO ingestion DAG."
+        loaded_at_field: loaded_at
+        freshness:
+          warn_after: {count: 60, period: minute}
+          error_after: {count: 240, period: minute}
+        columns:
+          - name: event_uuid
+            tests:
+              - not_null:
+                  severity: error
+          - name: source_file
+          - name: payment_id
+          - name: order_id
+          - name: amount
+          - name: currency
+          - name: status
+          - name: event_ts

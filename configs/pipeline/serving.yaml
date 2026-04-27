@@ -1,0 +1,26 @@
+version: 1
+
+conn_id: postgres_dwh
+
+indexes:
+  - table: marts.dim_customers
+    name: idx_dim_customers_email
+    columns: [email]
+  - table: marts.dim_customers
+    name: idx_dim_customers_current
+    columns: [customer_bk]
+    where: "is_current = TRUE"
+  - table: marts.fct_orders
+    name: idx_fct_orders_customer
+    columns: [customer_hk]
+  - table: marts.fct_orders
+    name: idx_fct_orders_order_ts
+    columns: [order_ts]
+
+vacuum_analyze:
+  - marts.dim_customers
+  - marts.fct_orders
+
+reindex:
+  - marts.dim_customers
+  - marts.fct_orders

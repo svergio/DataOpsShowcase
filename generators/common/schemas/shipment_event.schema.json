@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ShipmentEvent",
+  "type": "object",
+  "required": [
+    "event_id",
+    "event_type",
+    "shipment_id",
+    "order_id",
+    "tracking_number",
+    "carrier",
+    "status",
+    "timestamp"
+  ],
+  "properties": {
+    "event_id": {"type": "string"},
+    "event_type": {"type": "string"},
+    "shipment_id": {"type": "integer"},
+    "order_id": {"type": "integer"},
+    "tracking_number": {"type": "string"},
+    "carrier": {"type": "string"},
+    "status": {
+      "type": "string",
+      "enum": [
+        "LABEL_CREATED",
+        "PICKED_UP",
+        "IN_TRANSIT",
+        "OUT_FOR_DELIVERY",
+        "DELIVERED",
+        "EXCEPTION"
+      ]
+    },
+    "country": {"type": "string"},
+    "timestamp": {"type": "string", "format": "date-time"}
+  }
+}

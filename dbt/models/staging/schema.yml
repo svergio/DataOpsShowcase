@@ -1,0 +1,113 @@
+version: 2
+
+models:
+  - name: stg_customers
+    description: "Staging view: latest snapshot per customer (raw.oltp_users), normalised + hash_key + hashdiff."
+    config:
+      tags: ['staging', 'customers']
+    columns:
+      - name: hub_key
+        description: SHA-256 hash of customer_bk.
+        tests: [not_null]
+      - name: customer_bk
+        description: Business key (raw.oltp_users.user_id::text).
+        tests: [not_null, unique]
+      - name: email
+      - name: full_name
+      - name: registered_at
+      - name: load_dts
+        tests: [not_null]
+      - name: effective_from
+        tests: [not_null]
+      - name: record_source
+        tests: [not_null]
+      - name: hashdiff
+        tests: [not_null]
+
+  - name: stg_orders
+    description: "Staging view: latest snapshot per order (raw.oltp_orders)."
+    config:
+      tags: ['staging', 'orders']
+    columns:
+      - name: hub_key
+        tests: [not_null]
+      - name: order_bk
+        tests: [not_null, unique]
+      - name: customer_bk
+        tests: [not_null]
+      - name: order_ts
+        tests: [not_null]
+      - name: status
+        tests: [not_null]
+      - name: currency
+        tests: [not_null]
+      - name: total_amount
+        tests: [not_null]
+      - name: load_dts
+        tests: [not_null]
+      - name: effective_from
+        tests: [not_null]
+      - name: hashdiff
+        tests: [not_null]
+
+  - name: stg_products
+    description: "Staging view: latest snapshot per product (raw.oltp_products)."
+    config:
+      tags: ['staging', 'products']
+    columns:
+      - name: hub_key
+        tests: [not_null]
+      - name: product_bk
+        tests: [not_null, unique]
+      - name: seller_bk
+      - name: sku
+      - name: product_name
+      - name: category
+      - name: price
+      - name: is_active
+      - name: load_dts
+        tests: [not_null]
+      - name: effective_from
+        tests: [not_null]
+      - name: hashdiff
+        tests: [not_null]
+
+  - name: stg_payments
+    description: "Staging view: latest snapshot per payment, unioned from kafka_payments + stg_minio_payments."
+    config:
+      tags: ['staging', 'payments']
+    columns:
+      - name: hub_key
+        tests: [not_null]
+      - name: payment_bk
+        tests: [not_null, unique]
+      - name: order_bk
+        tests: [not_null]
+      - name: amount
+      - name: currency
+      - name: payment_method
+      - name: status
+      - name: event_ts
+      - name: load_dts
+        tests: [not_null]
+      - name: effective_from
+        tests: [not_null]
+      - name: hashdiff
+        tests: [not_null]
+
+  - name: stg_order_items
+    description: "Staging view of raw.oltp_order_items, used for link_order_product."
+    config:
+      tags: ['staging', 'order_items']
+    columns:
+      - name: order_item_bk
+        tests: [not_null, unique]
+      - name: order_bk
+        tests: [not_null]
+      - name: product_bk
+        tests: [not_null]
+      - name: quantity
+      - name: unit_price
+      - name: line_amount
+      - name: load_dts
+        tests: [not_null]

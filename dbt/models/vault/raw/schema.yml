@@ -1,0 +1,220 @@
+version: 2
+
+models:
+  # -------- HUBS --------
+  - name: hub_customers
+    description: "RDV Hub: unique customer business keys."
+    config:
+      tags: ['vault', 'rdv', 'hub']
+    columns:
+      - name: hub_key
+        description: SHA-256 of business_key.
+        tests: [not_null, unique]
+      - name: business_key
+        tests: [not_null, unique]
+      - name: load_dts
+        tests: [not_null]
+      - name: record_source
+        tests: [not_null]
+
+  - name: hub_orders
+    description: "RDV Hub: unique order business keys."
+    config:
+      tags: ['vault', 'rdv', 'hub']
+    columns:
+      - name: hub_key
+        tests: [not_null, unique]
+      - name: business_key
+        tests: [not_null, unique]
+      - name: load_dts
+        tests: [not_null]
+      - name: record_source
+        tests: [not_null]
+
+  - name: hub_products
+    description: "RDV Hub: unique product business keys."
+    config:
+      tags: ['vault', 'rdv', 'hub']
+    columns:
+      - name: hub_key
+        tests: [not_null, unique]
+      - name: business_key
+        tests: [not_null, unique]
+      - name: load_dts
+        tests: [not_null]
+      - name: record_source
+        tests: [not_null]
+
+  - name: hub_payments
+    description: "RDV Hub: unique payment business keys."
+    config:
+      tags: ['vault', 'rdv', 'hub']
+    columns:
+      - name: hub_key
+        tests: [not_null, unique]
+      - name: business_key
+        tests: [not_null, unique]
+      - name: load_dts
+        tests: [not_null]
+      - name: record_source
+        tests: [not_null]
+
+  # -------- LINKS --------
+  - name: link_customer_order
+    description: "RDV Link: customer <-> order."
+    config:
+      tags: ['vault', 'rdv', 'link']
+    columns:
+      - name: link_key
+        tests: [not_null, unique]
+      - name: customer_hub_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('hub_customers')
+              field: hub_key
+      - name: order_hub_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('hub_orders')
+              field: hub_key
+      - name: load_dts
+        tests: [not_null]
+      - name: record_source
+        tests: [not_null]
+
+  - name: link_order_payment
+    description: "RDV Link: order <-> payment."
+    config:
+      tags: ['vault', 'rdv', 'link']
+    columns:
+      - name: link_key
+        tests: [not_null, unique]
+      - name: order_hub_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('hub_orders')
+              field: hub_key
+      - name: payment_hub_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('hub_payments')
+              field: hub_key
+
+  - name: link_order_product
+    description: "RDV Link: order <-> product."
+    config:
+      tags: ['vault', 'rdv', 'link']
+    columns:
+      - name: link_key
+        tests: [not_null, unique]
+      - name: order_hub_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('hub_orders')
+              field: hub_key
+      - name: product_hub_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('hub_products')
+              field: hub_key
+
+  # -------- SATELLITES --------
+  - name: sat_customer_details
+    description: "RDV satellite, SCD2: customer descriptive attributes (email, full_name, registered_at)."
+    config:
+      tags: ['vault', 'rdv', 'satellite', 'scd2']
+    columns:
+      - name: hub_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('hub_customers')
+              field: hub_key
+      - name: hashdiff
+        tests: [not_null]
+      - name: load_dts
+        tests: [not_null]
+      - name: effective_from
+        tests: [not_null]
+      - name: is_current
+        tests: [not_null]
+      - name: record_source
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: ['hub_key', 'effective_from']
+
+  - name: sat_order_status
+    description: "RDV satellite, SCD2: order status, currency, total_amount, order_ts."
+    config:
+      tags: ['vault', 'rdv', 'satellite', 'scd2']
+    columns:
+      - name: hub_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('hub_orders')
+              field: hub_key
+      - name: hashdiff
+        tests: [not_null]
+      - name: load_dts
+        tests: [not_null]
+      - name: effective_from
+        tests: [not_null]
+      - name: is_current
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: ['hub_key', 'effective_from']
+
+  - name: sat_product_attributes
+    description: "RDV satellite, SCD2: product descriptive attributes."
+    config:
+      tags: ['vault', 'rdv', 'satellite', 'scd2']
+    columns:
+      - name: hub_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('hub_products')
+              field: hub_key
+      - name: hashdiff
+        tests: [not_null]
+      - name: load_dts
+        tests: [not_null]
+      - name: effective_from
+        tests: [not_null]
+      - name: is_current
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: ['hub_key', 'effective_from']
+
+  - name: sat_payment_details
+    description: "RDV satellite, SCD2: payment descriptive attributes."
+    config:
+      tags: ['vault', 'rdv', 'satellite', 'scd2']
+    columns:
+      - name: hub_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('hub_payments')
+              field: hub_key
+      - name: hashdiff
+        tests: [not_null]
+      - name: load_dts
+        tests: [not_null]
+      - name: effective_from
+        tests: [not_null]
+      - name: is_current
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: ['hub_key', 'effective_from']

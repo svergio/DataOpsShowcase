@@ -1,0 +1,85 @@
+version: 1
+
+oltp:
+  conn_id: postgres_oltp
+  watermark_column: created_at
+  fallback_watermark: "1970-01-01T00:00:00+00:00"
+  batch_size: 5000
+  tables:
+    - source_table: users
+      target_table: raw.oltp_users
+      pk: [user_id]
+      columns: [user_id, email, full_name, created_at]
+    - source_table: sellers
+      target_table: raw.oltp_sellers
+      pk: [seller_id]
+      columns: [seller_id, seller_name, rating, created_at]
+    - source_table: products
+      target_table: raw.oltp_products
+      pk: [product_id]
+      columns: [product_id, seller_id, sku, product_name, category, price, is_active, created_at]
+    - source_table: orders
+      target_table: raw.oltp_orders
+      pk: [order_id]
+      watermark_column: order_ts
+      columns: [order_id, user_id, order_ts, status, currency_code, total_amount]
+    - source_table: order_items
+      target_table: raw.oltp_order_items
+      pk: [order_item_id]
+      watermark_column: null
+      columns: [order_item_id, order_id, product_id, quantity, unit_price]
+
+kafka:
+  bootstrap_servers_env: KAFKA_BOOTSTRAP_SERVERS
+  consumer_group_prefix: dataops-airflow
+  poll_timeout_seconds: 5
+  max_messages_per_run: 5000
+  max_empty_polls: 3
+  topics:
+    orders:
+      topic_env: KAFKA_TOPIC_ORDERS
+      target_table: raw.kafka_orders
+      target_columns:
+        - event_id
+        - event_type
+        - order_id
+        - customer_id
+        - total_amount
+        - currency
+        - country_code
+        - event_ts
+      payload_field: payload
+    payments:
+      topic_env: KAFKA_TOPIC_PAYMENTS
+      target_table: raw.kafka_payments
+      target_columns:
+        - event_id
+        - event_type
+        - payment_id
+        - order_id
+        - transaction_id
+        - amount
+        - currency
+        - payment_method
+        - status
+        - decline_reason
+        - event_ts
+      payload_field: payload
+
+minio:
+  endpoint_env: MINIO_ENDPOINT
+  access_key_env: MINIO_ROOT_USER
+  secret_key_env: MINIO_ROOT_PASSWORD
+  bucket_env: MINIO_BUCKET_RAW
+  prefixes:
+    - prefix_env: MINIO_PREFIX_PAYMENTS
+      target_table: raw.minio_files_landing
+      file_format: jsonl
+    - prefix_env: MINIO_PREFIX_RETURNS
+      target_table: raw.minio_files_landing
+      file_format: jsonl
+    - prefix_env: MINIO_PREFIX_CATALOG
+      target_table: raw.minio_files_landing
+      file_format: csv
+  state_table: raw.minio_files_landing
+  max_files_per_run: 200

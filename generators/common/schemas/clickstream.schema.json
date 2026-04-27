@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ClickstreamEvent",
+  "type": "object",
+  "required": ["event_id", "event_type", "timestamp", "session_id"],
+  "properties": {
+    "event_id": {"type": "string"},
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "PAGE_VIEW",
+        "PRODUCT_VIEW",
+        "ADD_TO_CART",
+        "REMOVE_FROM_CART",
+        "CHECKOUT_START",
+        "SEARCH",
+        "FILTER_APPLIED"
+      ]
+    },
+    "timestamp": {"type": "integer"},
+    "session_id": {"type": "string"},
+    "customer_id": {"type": ["integer", "null"]},
+    "product_id": {"type": ["integer", "null"]},
+    "category": {"type": ["string", "null"]},
+    "page_url": {"type": "string"},
+    "device_type": {"type": "string"},
+    "country_code": {"type": "string"},
+    "metadata": {"type": "object"}
+  }
+}

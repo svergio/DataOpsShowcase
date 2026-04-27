@@ -1,0 +1,100 @@
+version: 1
+owner: dataops-platform
+default_pool: dataops_default
+default_retries: 3
+default_retry_delay_minutes: 5
+default_sla_minutes: 60
+
+datasets:
+  raw_oltp: "postgres://postgres_dwh/raw/oltp"
+  raw_kafka_orders: "postgres://postgres_dwh/raw/kafka_orders"
+  raw_kafka_payments: "postgres://postgres_dwh/raw/kafka_payments"
+  raw_minio_files: "postgres://postgres_dwh/raw/minio_files"
+  stg_clean: "postgres://postgres_dwh/staging/clean"
+  vault_loaded: "postgres://postgres_dwh/vault/loaded"
+  vault_scd2_done: "postgres://postgres_dwh/vault/scd2"
+  dbt_staging_done: "dbt://staging"
+  dbt_vault_done: "dbt://vault"
+  dbt_marts_done: "dbt://marts"
+  dq_passed: "dq://post-marts"
+  serving_optimized: "serving://marts-optimized"
+  ml_train_done: "ml://spark-training"
+
+dags:
+  - id: dag_ingest_oltp_to_stg
+    schedule: "*/15 * * * *"
+    layer: ingestion
+    source: oltp
+    produces: [raw_oltp]
+
+  - id: dag_ingest_kafka_orders_to_raw
+    schedule: "*/5 * * * *"
+    layer: ingestion
+    source: kafka.orders
+    produces: [raw_kafka_orders]
+
+  - id: dag_ingest_kafka_payments_to_raw
+    schedule: "*/5 * * * *"
+    layer: ingestion
+    source: kafka.payments
+    produces: [raw_kafka_payments]
+
+  - id: dag_ingest_minio_files_to_raw
+    schedule: "*/15 * * * *"
+    layer: ingestion
+    source: minio
+    produces: [raw_minio_files]
+
+  - id: dag_spark_preprocess_to_stg
+    schedule: null
+    layer: preprocessing
+    consumes: [raw_oltp, raw_kafka_orders, raw_kafka_payments, raw_minio_files]
+    produces: [stg_clean]
+
+  - id: dag_load_datavault
+    schedule: null
+    layer: vault
+    consumes: [stg_clean]
+    produces: [vault_loaded]
+
+  - id: dag_scd2_satellites
+    schedule: null
+    layer: vault
+    consumes: [vault_loaded]
+    produces: [vault_scd2_done]
+
+  - id: dag_dbt_staging_rest
+    schedule: null
+    layer: dbt
+    consumes: [vault_scd2_done]
+    produces: [dbt_staging_done]
+
+  - id: dag_dbt_vault_rest
+    schedule: null
+    layer: dbt
+    consumes: [dbt_staging_done]
+    produces: [dbt_vault_done]
+
+  - id: dag_dbt_marts_rest
+    schedule: null
+    layer: dbt
+    consumes: [dbt_vault_done]
+    produces: [dbt_marts_done]
+
+  - id: dag_data_quality_checks
+    schedule: null
+    layer: quality
+    consumes: [dbt_marts_done]
+    produces: [dq_passed]
+
+  - id: dag_serving_optimizations
+    schedule: null
+    layer: serving
+    consumes: [dq_passed]
+    produces: [serving_optimized]
+
+  - id: dag_ml_train_spark
+    schedule: null
+    layer: mlops
+    consumes: [dbt_marts_done]
+    produces: [ml_train_done]

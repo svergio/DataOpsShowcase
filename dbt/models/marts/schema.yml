@@ -1,0 +1,105 @@
+version: 2
+
+models:
+  - name: dim_customers
+    description: "Customer dimension with BDV-derived segment, sourced from sat_customer_business."
+    config:
+      tags: ['marts', 'dim']
+    columns:
+      - name: customer_hub_key
+        tests: [not_null, unique]
+      - name: customer_bk
+        tests: [not_null]
+      - name: email
+      - name: full_name
+      - name: customer_segment
+        tests:
+          - accepted_values:
+              values: ['platinum', 'gold', 'silver', 'bronze']
+              config:
+                where: "customer_segment is not null"
+      - name: bdv_load_dts
+      - name: mart_load_dts
+        tests: [not_null]
+
+  - name: dim_products
+    description: "Product dimension with current attributes from sat_product_attributes."
+    config:
+      tags: ['marts', 'dim']
+    columns:
+      - name: product_hub_key
+        tests: [not_null, unique]
+      - name: product_bk
+        tests: [not_null]
+      - name: sku
+      - name: product_name
+      - name: category
+      - name: price
+      - name: is_active
+
+  - name: fct_orders
+    description: "Order fact built on bridge_customer_order + sat_order_enriched."
+    config:
+      tags: ['marts', 'fact']
+    columns:
+      - name: order_hub_key
+        tests: [not_null, unique]
+      - name: order_bk
+        tests: [not_null]
+      - name: customer_hub_key
+        tests:
+          - relationships:
+              to: ref('dim_customers')
+              field: customer_hub_key
+              config:
+                where: "customer_hub_key is not null"
+      - name: status
+      - name: total_amount
+      - name: currency
+      - name: order_ts
+      - name: order_date
+      - name: payment_state
+        tests:
+          - accepted_values:
+              values: ['fully_paid', 'partially_paid', 'unpaid']
+              config:
+                where: "payment_state is not null"
+
+  - name: fct_payments
+    description: "Payment fact joined to link_order_payment for order_hub_key."
+    config:
+      tags: ['marts', 'fact']
+    columns:
+      - name: payment_hub_key
+        tests: [not_null, unique]
+      - name: payment_bk
+        tests: [not_null]
+      - name: order_hub_key
+        tests:
+          - relationships:
+              to: ref('fct_orders')
+              field: order_hub_key
+              config:
+                where: "order_hub_key is not null"
+      - name: amount
+      - name: status
+      - name: payment_method
+      - name: payment_ts
+      - name: payment_date
+
+  - name: fct_daily_sales
+    description: "Daily sales aggregation per currency."
+    config:
+      tags: ['marts', 'fact', 'daily']
+    columns:
+      - name: order_date
+        tests: [not_null]
+      - name: currency
+        tests: [not_null]
+      - name: order_count
+        tests: [not_null]
+      - name: gross_sales
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: ['order_date', 'currency']

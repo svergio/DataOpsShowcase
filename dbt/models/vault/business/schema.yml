@@ -1,0 +1,151 @@
+version: 2
+
+models:
+  # -------- PIT --------
+  - name: pit_customer
+    description: "Point-in-Time table for customer hub. Daily grain x hub_key."
+    config:
+      tags: ['vault', 'bdv', 'pit']
+    columns:
+      - name: hub_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('hub_customers')
+              field: hub_key
+      - name: as_of_date
+        tests: [not_null]
+      - name: pit_load_dts
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: ['hub_key', 'as_of_date']
+
+  - name: pit_order
+    description: "Point-in-Time table for order hub. Daily grain x hub_key."
+    config:
+      tags: ['vault', 'bdv', 'pit']
+    columns:
+      - name: hub_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('hub_orders')
+              field: hub_key
+      - name: as_of_date
+        tests: [not_null]
+      - name: pit_load_dts
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: ['hub_key', 'as_of_date']
+
+  # -------- BRIDGE --------
+  - name: bridge_customer_order
+    description: "Bridge table flattening link_customer_order with both hubs."
+    config:
+      tags: ['vault', 'bdv', 'bridge']
+    columns:
+      - name: bridge_key
+        tests: [not_null, unique]
+      - name: link_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('link_customer_order')
+              field: link_key
+      - name: customer_hub_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('hub_customers')
+              field: hub_key
+      - name: order_hub_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('hub_orders')
+              field: hub_key
+
+  - name: bridge_order_product
+    description: "Bridge table for order <-> product with pre-aggregated line metrics."
+    config:
+      tags: ['vault', 'bdv', 'bridge']
+    columns:
+      - name: bridge_key
+        tests: [not_null, unique]
+      - name: link_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('link_order_product')
+              field: link_key
+      - name: order_hub_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('hub_orders')
+              field: hub_key
+      - name: product_hub_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('hub_products')
+              field: hub_key
+      - name: total_quantity
+      - name: total_line_amount
+
+  # -------- BUSINESS SATELLITES --------
+  - name: sat_customer_business
+    description: "BDV business satellite for customers: derived segment, email_domain, validation."
+    config:
+      tags: ['vault', 'bdv', 'business_satellite', 'scd2']
+    columns:
+      - name: hub_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('hub_customers')
+              field: hub_key
+      - name: hashdiff
+        tests: [not_null]
+      - name: load_dts
+        tests: [not_null]
+      - name: effective_from
+        tests: [not_null]
+      - name: is_current
+        tests: [not_null]
+      - name: customer_segment
+        tests:
+          - accepted_values:
+              values: ['platinum', 'gold', 'silver', 'bronze']
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: ['hub_key', 'effective_from']
+
+  - name: sat_order_enriched
+    description: "BDV business satellite for orders: enriched with payment match, totals, line counts."
+    config:
+      tags: ['vault', 'bdv', 'business_satellite', 'scd2']
+    columns:
+      - name: hub_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('hub_orders')
+              field: hub_key
+      - name: hashdiff
+        tests: [not_null]
+      - name: load_dts
+        tests: [not_null]
+      - name: effective_from
+        tests: [not_null]
+      - name: is_current
+        tests: [not_null]
+      - name: payment_state
+        tests:
+          - accepted_values:
+              values: ['fully_paid', 'partially_paid', 'unpaid']
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: ['hub_key', 'effective_from']

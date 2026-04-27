@@ -1,0 +1,4 @@
+experiment: order_value_regressor
+lookback_days: 30
+train_ratio: 0.8
+seed: 42

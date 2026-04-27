@@ -1,0 +1,67 @@
+version: 1
+
+severity_levels: [warning, error, critical]
+fail_on:
+  - error
+  - critical
+
+checks:
+  - name: stg_customers_pk_unique
+    table: staging.stg_customers
+    type: unique
+    columns: [customer_id]
+    severity: critical
+
+  - name: stg_orders_not_null
+    table: staging.stg_orders
+    type: not_null
+    columns: [order_id, customer_id, order_ts, status]
+    severity: critical
+
+  - name: stg_orders_total_positive
+    table: staging.stg_orders
+    type: range
+    column: total_amount
+    min_value: 0
+    severity: error
+
+  - name: vault_hub_customers_unique_bk
+    table: vault.hub_customers
+    type: unique
+    columns: [customer_bk]
+    severity: critical
+
+  - name: vault_link_referential_integrity
+    table: vault.link_customer_orders
+    type: referential
+    parent_table: vault.hub_customers
+    parent_column: customer_hk
+    child_column: customer_hk
+    severity: critical
+
+  - name: vault_sat_customer_one_current
+    table: vault.sat_customer_details
+    type: scd2_one_current
+    business_hk: customer_hk
+    severity: critical
+
+  - name: vault_sat_order_one_current
+    table: vault.sat_order_status
+    type: scd2_one_current
+    business_hk: order_hk
+    severity: critical
+
+  - name: marts_fct_orders_referential
+    table: marts.fct_orders
+    type: referential
+    parent_table: marts.dim_customers
+    parent_column: customer_hk
+    child_column: customer_hk
+    severity: error
+
+  - name: marts_fct_orders_amount_positive
+    table: marts.fct_orders
+    type: range
+    column: total_amount
+    min_value: 0
+    severity: error

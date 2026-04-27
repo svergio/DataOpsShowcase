@@ -1,40 +1,41 @@
 # TechMart Data Platform Showcase
 
-Pet-project data platform for a marketplace analytics use case.
+Пет-проект дата-платформы для аналитики маркетплейса.
 
-## Project Goals
+## Цели проекта
 
-- Build end-to-end batch and streaming data pipelines
-- Practice orchestration with Airflow
-- Transform data with dbt and Spark
-- Add data quality checks and monitoring
-- Implement analytics marts and near-real-time processing
+- Построить end-to-end batch и streaming пайплайны данных
+- Практиковать оркестрацию пайплайнов через Airflow
+- Выполнить трансформации данных в dbt и Spark
+- Добавить проверки качества данных и мониторинг
+- Реализовать аналитические витрины и обработку, близкую к real-time
 
-## Repository Structure
+## Структура репозитория
 
-- `services` - service-level configs (Postgres, Airflow, Spark, Redis, etc.)
-- `pipelines` - DAGs, custom operators, sensors, pipeline utils
-- `spark_jobs` - PySpark jobs for ingestion and transformations
-- `dbt` - dbt project models, macros, snapshots, tests
-- `streaming` - Kafka producers/consumers and streaming helpers
-- `data_generators` - synthetic data and JSON schemas
-- `infra` - monitoring and infra-related assets
-- `scripts` - setup, maintenance, deployment, testing helpers
-- `configs` - shared app and tool configuration
-- `docs` - architecture and documentation materials
-- `docs/Tasks` - task breakdown extracted from `Task.md`
-- `tests` - test-related directories for implementation stage
+- `pipelines` - DAG'и Airflow, плагины, датасеты, утилиты
+- `services` - общие библиотеки (storage, kafka, dbt client, логи/метрики) и конфиги сервисов (Postgres, Airflow, MinIO, Redis)
+- `services/dbt_web` - UI для dbt (backend FastAPI + frontend)
+- `spark/jobs` - PySpark entrypoints, `spark/common` - общий код с JDBC/Spark
+- `ml` - обучение (Spark/MLflow), конфиги и заготовки features/inference
+- `generators` - генераторы данных: `common/` (фабрики, схемы, коннекторы), `kafka/`, `generator.py`, Docker
+- `dbt` - dbt: staging, vault, marts, serving, тесты, макросы
+- `configs` - YAML пайплайнов, Airflow, spark defaults
+- `infra` - init SQL, Prometheus, Grafana
+- `scripts` - вспомогательные CLI (публикация артефактов dbt)
+- `docs` - [README.md](docs/README.md) (EN), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [PIPELINES.md](docs/PIPELINES.md), [ML.md](docs/ML.md), [SETUP.md](docs/SETUP.md)
+- `tests` - pytest (unit)
+- `streaming` - дополнительные модули streaming (если используются)
 
-## Tasks
+## Задания
 
-Task descriptions are available in:
+Описание задач находится в:
 
-- `Task.md` - source document
-- `docs/Tasks` - separated task files (`Task_01...Task_50`)
+- `Task.md` - исходный документ
+- `docs/Tasks` - отдельные файлы задач (`Task_01...Task_50`)
 
-## Quick Start
+## Быстрый старт
 
-1. Clone the repository
-2. Configure environment variables
-3. Bring up local services with Docker Compose
-4. Start implementing tasks sequentially from `docs/Tasks`
+1. Клонировать репозиторий
+2. Настроить переменные окружения
+3. Поднять локальные сервисы через Docker Compose
+4. Начать выполнение задач по порядку из `docs/Tasks`

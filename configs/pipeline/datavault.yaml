@@ -1,0 +1,60 @@
+version: 1
+record_source_default: dataops_showcase
+
+hubs:
+  hub_customers:
+    source: staging.stg_customers
+    business_key: customer_id
+    hash_key: customer_hk
+    record_source_column: source
+    record_source_value: oltp.users
+
+  hub_orders:
+    source: staging.stg_orders
+    business_key: order_id
+    hash_key: order_hk
+    record_source_value: oltp.orders
+
+links:
+  link_customer_orders:
+    source: staging.stg_orders
+    hash_key: link_hk
+    components:
+      - target_column: customer_hk
+        bk_column: customer_id
+        hub: hub_customers
+      - target_column: order_hk
+        bk_column: order_id
+        hub: hub_orders
+    record_source_value: oltp.orders
+
+satellites:
+  sat_customer_details:
+    parent_hub: hub_customers
+    source: staging.stg_customers
+    business_key: customer_id
+    hash_key: customer_hk
+    effective_from_column: registered_at
+    record_source_value: oltp.users
+    descriptive_columns:
+      - email
+      - full_name
+    hash_diff_columns:
+      - email
+      - full_name
+
+  sat_order_status:
+    parent_hub: hub_orders
+    source: staging.stg_orders
+    business_key: order_id
+    hash_key: order_hk
+    effective_from_column: order_ts
+    record_source_value: oltp.orders
+    descriptive_columns:
+      - status
+      - total_amount
+      - currency
+    hash_diff_columns:
+      - status
+      - total_amount
+      - currency

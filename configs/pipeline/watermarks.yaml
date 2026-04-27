@@ -1,0 +1,37 @@
+version: 1
+
+storage:
+  conn_id: postgres_dwh
+  table: meta.pipeline_watermarks
+  schema_init: services/postgres/init/04_dwh_extensions.sql
+
+defaults:
+  fallback_timestamp: "1970-01-01T00:00:00+00:00"
+  retention_days: 90
+
+pipelines:
+  oltp.users:
+    watermark_type: timestamp
+    column: created_at
+  oltp.sellers:
+    watermark_type: timestamp
+    column: created_at
+  oltp.products:
+    watermark_type: timestamp
+    column: created_at
+  oltp.orders:
+    watermark_type: timestamp
+    column: order_ts
+  oltp.order_items:
+    watermark_type: id
+    column: order_item_id
+    fallback_id: 0
+
+  kafka.orders:
+    watermark_type: kafka_offset
+  kafka.payments:
+    watermark_type: kafka_offset
+
+  minio.files:
+    watermark_type: file_marker
+    state_table: raw.minio_files_landing

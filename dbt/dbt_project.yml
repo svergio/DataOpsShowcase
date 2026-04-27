@@ -1,0 +1,100 @@
+name: dataops_showcase
+version: '1.0.0'
+config-version: 2
+
+profile: dataops_showcase
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+analysis-paths: ["analyses"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - target
+  - dbt_packages
+  - logs
+
+quoting:
+  database: false
+  schema: false
+  identifier: false
+
+vars:
+  record_source_default: 'dataops_showcase'
+  high_water_mark_lookback_hours: 6
+  scd2_open_high_value_dts: '9999-12-31 00:00:00+00'
+
+models:
+  dataops_showcase:
+    +persist_docs:
+      relation: true
+      columns: true
+
+    staging:
+      +schema: dwh_staging
+      +materialized: view
+      +tags: ['staging']
+
+    vault:
+      raw:
+        +schema: dwh_vault
+        +tags: ['vault', 'rdv']
+        hubs:
+          +materialized: incremental
+          +incremental_strategy: append
+          +on_schema_change: append_new_columns
+          +tags: ['hub']
+        links:
+          +materialized: incremental
+          +incremental_strategy: append
+          +on_schema_change: append_new_columns
+          +tags: ['link']
+        satellites:
+          +materialized: incremental
+          +incremental_strategy: append
+          +on_schema_change: append_new_columns
+          +tags: ['satellite', 'scd2']
+      business:
+        +schema: dwh_bdv
+        +tags: ['vault', 'bdv']
+        pit:
+          +materialized: incremental
+          +incremental_strategy: delete+insert
+          +tags: ['pit']
+        bridge:
+          +materialized: incremental
+          +incremental_strategy: delete+insert
+          +tags: ['bridge']
+        business_satellites:
+          +materialized: incremental
+          +incremental_strategy: append
+          +on_schema_change: append_new_columns
+          +tags: ['business_satellite', 'scd2']
+
+    marts:
+      +schema: dwh_marts
+      +materialized: incremental
+      +incremental_strategy: delete+insert
+      +on_schema_change: append_new_columns
+      +tags: ['marts']
+
+    serving:
+      +schema: dwh_serving
+      +materialized: table
+      +tags: ['serving']
+
+seeds:
+  dataops_showcase:
+    +schema: dwh_staging
+    +quote_columns: false
+
+tests:
+  dataops_showcase:
+    +severity: error
+    +store_failures: true
+    +schema: dwh_dq
+
+on-run-start:
+  - "{{ ensure_dwh_schemas() }}"

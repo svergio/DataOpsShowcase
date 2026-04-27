@@ -1,0 +1,56 @@
+version: 1
+
+connection:
+  base_url_env: DBT_REST_BASE_URL
+  default_base_url: "http://dbt-rest:8580"
+  token_env: DBT_REST_TOKEN
+  timeout_seconds: 30
+  verify_tls: false
+
+retry:
+  trigger_max_attempts: 5
+  trigger_backoff_seconds: 10
+  trigger_backoff_factor: 2.0
+  poll_interval_seconds: 20
+  poll_max_total_seconds: 7200
+
+runs:
+  freshness:
+    dag_id: dag_dbt_staging_rest
+    job_name: dataops_freshness
+    command: source freshness
+    selectors: []
+    target: dwh
+    fail_on_test_failure: true
+
+  staging:
+    dag_id: dag_dbt_staging_rest
+    job_name: dataops_staging
+    selectors:
+      - "tag:staging"
+    target: dwh
+    fail_on_test_failure: true
+
+  vault:
+    dag_id: dag_dbt_vault_rest
+    job_name: dataops_vault
+    selectors:
+      - "tag:vault"
+    target: dwh
+    fail_on_test_failure: true
+
+  marts:
+    dag_id: dag_dbt_marts_rest
+    job_name: dataops_marts
+    selectors:
+      - "tag:marts"
+    target: dwh
+    fail_on_test_failure: true
+
+  docs:
+    dag_id: dag_dbt_marts_rest
+    job_name: dataops_docs
+    command: docs generate
+    selectors: []
+    target: dwh
+    fail_on_test_failure: true

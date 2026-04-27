@@ -1,0 +1,6 @@
+psycopg[binary]==3.2.1
+confluent-kafka==2.5.0
+redis==5.0.7
+minio==7.2.7
+faker==27.0.0
+python-dateutil==2.9.0.post0
