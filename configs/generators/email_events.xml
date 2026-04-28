@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Kafka: techmart.marketing.email_events throughput and event/email-client mix.
+-->
+<generator name="email_events">
+  <throughput>
+    <events_per_tick_min>8</events_per_tick_min>
+    <events_per_tick_max>40</events_per_tick_max>
+  </throughput>
+  <email_event_types>
+    <item>EMAIL_SENT</item>
+    <item>EMAIL_DELIVERED</item>
+    <item>EMAIL_OPENED</item>
+    <item>EMAIL_CLICKED</item>
+    <item>EMAIL_BOUNCED</item>
+    <item>EMAIL_UNSUBSCRIBED</item>
+    <item>EMAIL_SPAM_REPORTED</item>
+  </email_event_types>
+  <bounce_reasons>
+    <item>MAILBOX_FULL</item>
+    <item>INVALID_EMAIL</item>
+    <item>DOMAIN_NOT_FOUND</item>
+    <item>SPAM_FILTER</item>
+    <item>USER_UNKNOWN</item>
+  </bounce_reasons>
+  <email_client_weights>
+    <weight name="Gmail" value="0.45"/>
+    <weight name="Apple Mail" value="0.25"/>
+    <weight name="Outlook" value="0.15"/>
+    <weight name="Yahoo" value="0.08"/>
+    <weight name="Other" value="0.07"/>
+  </email_client_weights>
+</generator>

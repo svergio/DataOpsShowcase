@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Kafka: organic_sessions; bounce/conversion keyed by landing and intent heuristics.
+-->
+<generator name="organic_sessions">
+  <throughput>
+    <events_per_tick_min>5</events_per_tick_min>
+    <events_per_tick_max>25</events_per_tick_max>
+  </throughput>
+  <identified_user_probability>0.70</identified_user_probability>
+  <landing_pages>
+    <item>/</item>
+    <item>/blog</item>
+    <item>/blog/how-to-laptop</item>
+    <item>/p/headphones</item>
+    <item>/category/laptops</item>
+  </landing_pages>
+  <organic_keywords>
+    <item>techmart headphones</item>
+    <item>best tablet</item>
+    <item>noise cancelling</item>
+    <item>buy cheap tablet</item>
+    <item>how to choose laptop</item>
+  </organic_keywords>
+  <bounce_rates>
+    <page path="homepage" rate="0.45"/>
+    <page path="product_page" rate="0.35"/>
+    <page path="category_page" rate="0.50"/>
+    <page path="blog_post" rate="0.70"/>
+  </bounce_rates>
+  <conversion_rates>
+    <intent name="branded_keyword" rate="0.08"/>
+    <intent name="product_keyword" rate="0.05"/>
+    <intent name="category_keyword" rate="0.02"/>
+    <intent name="informational" rate="0.005"/>
+  </conversion_rates>
+</generator>

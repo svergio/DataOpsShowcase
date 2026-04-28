@@ -103,9 +103,19 @@ models:
       - name: order_item_bk
         tests: [not_null, unique]
       - name: order_bk
-        tests: [not_null]
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_bk
       - name: product_bk
-        tests: [not_null]
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_products')
+                field: product_bk
       - name: quantity
       - name: unit_price
       - name: line_amount

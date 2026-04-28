@@ -45,6 +45,13 @@ sources:
           - name: rating
           - name: created_at
           - name: ingested_at
+            tests:
+              - not_null:
+                  severity: error
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [seller_id, ingested_at]
+              severity: error
       - name: oltp_products
         loaded_at_field: ingested_at
         freshness:
@@ -56,6 +63,9 @@ sources:
               - not_null:
                   severity: error
           - name: seller_id
+            tests:
+              - not_null:
+                  severity: error
           - name: sku
           - name: product_name
           - name: category
@@ -63,6 +73,9 @@ sources:
           - name: is_active
           - name: created_at
           - name: ingested_at
+            tests:
+              - not_null:
+                  severity: error
       - name: oltp_orders
         loaded_at_field: ingested_at
         freshness:
@@ -85,6 +98,9 @@ sources:
           - name: currency_code
           - name: total_amount
           - name: ingested_at
+            tests:
+              - not_null:
+                  severity: error
       - name: oltp_order_items
         loaded_at_field: ingested_at
         freshness:
@@ -106,6 +122,9 @@ sources:
           - name: quantity
           - name: unit_price
           - name: ingested_at
+            tests:
+              - not_null:
+                  severity: error
       - name: kafka_orders
         description: "Kafka order events micro-batches."
         loaded_at_field: ingested_at
@@ -124,6 +143,10 @@ sources:
           - name: customer_id
           - name: total_amount
           - name: event_ts
+          - name: ingested_at
+            tests:
+              - not_null:
+                  severity: error
           - name: payload
       - name: kafka_payments
         description: "Kafka payment transaction events."
@@ -143,6 +166,10 @@ sources:
           - name: amount
           - name: status
           - name: event_ts
+          - name: ingested_at
+            tests:
+              - not_null:
+                  severity: error
           - name: payload
 
   - name: staging_pipeline
@@ -172,3 +199,7 @@ sources:
           - name: currency
           - name: status
           - name: event_ts
+          - name: loaded_at
+            tests:
+              - not_null:
+                  severity: error

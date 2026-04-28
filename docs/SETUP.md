@@ -41,9 +41,29 @@ Nginx публикует единую точку входа: dbt-web, Airflow, M
 
 ```bash
 cd DataOpsShowcase
-pip install -r requirements/dev.txt
+pip install pytest numpy 'psycopg[binary]'
+pip install -r generators/requirements.txt
 pytest tests/unit
 ```
+
+По умолчанию в `pytest.ini` перечислены маркеры (`integration`). **Юнит-тесты генератора** живут в `tests/unit/test_generators_config.py`, `test_company_profile.py`, `test_domain_constants.py`, `test_generator_xml_config.py`; зависимости — [generators/requirements.txt](../generators/requirements.txt) плюс `pytest`.
+
+**Интеграционные тесты** ([tests/integration/test_generator_connectivity.py](../tests/integration/test_generator_connectivity.py)): проверка доступности Postgres, Redis, Kafka и MinIO из хоста против поднятого `docker compose`. Помечены `@pytest.mark.integration`. Задайте переменные (пример для портов, проброшенных на localhost):
+
+```bash
+export GENERATOR_IT_OLTP_DSN=postgresql://user:pass@localhost:55432/techmart_oltp
+export GENERATOR_IT_REDIS_URL=redis://localhost:6379/0
+export GENERATOR_IT_KAFKA_BOOTSTRAP=localhost:9092
+export GENERATOR_IT_MINIO_ENDPOINT=localhost:9000
+export GENERATOR_IT_MINIO_ACCESS_KEY=minio
+export GENERATOR_IT_MINIO_SECRET_KEY=minio123
+# опционально HTTPS к MinIO:
+# export GENERATOR_IT_MINIO_SECURE=true
+
+pytest tests/integration -m integration -q
+```
+
+Если переменная для сервиса не задана, соответствующий тест **пропускается** (`skip`), а не падает.
 
 Тесты **dbt-web** backend (без отдельного Node-сборщика в CI):
 

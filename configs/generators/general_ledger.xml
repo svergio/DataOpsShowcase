@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  OLTP seed: synthetic GL SALE double-entries + optional edge-case imbalance rate.
+-->
+<generator name="general_ledger">
+  <volume>
+    <total_entries>2000</total_entries>
+  </volume>
+  <gl_edge_cases>
+    <unbalanced_pct>0.005</unbalanced_pct>
+  </gl_edge_cases>
+</generator>

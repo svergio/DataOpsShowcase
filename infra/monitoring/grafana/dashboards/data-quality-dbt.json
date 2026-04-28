@@ -12,7 +12,7 @@
       }
     ]
   },
-  "description": "Transformation layer health for dbt. Model-level only. Answers: which models are slow, which models are failing, which tests broke.",
+  "description": "dbt layer runs via Pushgateway (dataops_dbt_*). Complements SQL checks in meta / dwh_dq.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -23,14 +23,16 @@
     {
       "id": 1,
       "type": "stat",
-      "title": "Model Failure Ratio (24h)",
+      "title": "dbt run success ratio (24h)",
       "datasource": {"type": "prometheus", "uid": "Prometheus"},
       "gridPos": {"h": 5, "w": 8, "x": 0, "y": 0},
       "options": {
         "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
         "textMode": "auto",
         "colorMode": "background",
-        "graphMode": "area"
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto"
       },
       "fieldConfig": {
         "defaults": {
@@ -42,9 +44,9 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "green", "value": null},
-              {"color": "orange", "value": 0.02},
-              {"color": "red", "value": 0.05}
+              {"color": "red", "value": null},
+              {"color": "orange", "value": 0.9},
+              {"color": "green", "value": 0.99}
             ]
           }
         },
@@ -53,8 +55,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(increase(dbt_model_failures_total[24h])) / clamp_min(sum(increase(dbt_model_run_duration_seconds_count[24h])), 1)",
-          "legendFormat": "model failure ratio",
+          "expr": "sum(increase(dataops_dbt_run_outcome_total{status=\"success\"}[24h])) / clamp_min(sum(increase(dataops_dbt_run_outcome_total[24h])), 1)",
+          "legendFormat": "success ratio",
           "datasource": {"type": "prometheus", "uid": "Prometheus"}
         }
       ]
@@ -62,7 +64,7 @@
     {
       "id": 2,
       "type": "stat",
-      "title": "Failed Models (24h)",
+      "title": "Non-success dbt runs (24h)",
       "datasource": {"type": "prometheus", "uid": "Prometheus"},
       "gridPos": {"h": 5, "w": 8, "x": 8, "y": 0},
       "options": {
@@ -90,8 +92,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(increase(dbt_model_failures_total[24h]))",
-          "legendFormat": "failed models",
+          "expr": "sum(increase(dataops_dbt_run_outcome_total{status!=\"success\"}[24h]))",
+          "legendFormat": "non-success",
           "datasource": {"type": "prometheus", "uid": "Prometheus"}
         }
       ]
@@ -99,7 +101,7 @@
     {
       "id": 3,
       "type": "stat",
-      "title": "Test Failures (24h)",
+      "title": "Reported test failures (last gauge push)",
       "datasource": {"type": "prometheus", "uid": "Prometheus"},
       "gridPos": {"h": 5, "w": 8, "x": 16, "y": 0},
       "options": {
@@ -127,8 +129,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(increase(dbt_test_failures_total[24h]))",
-          "legendFormat": "test failures",
+          "expr": "sum(dataops_dbt_test_failures_total)",
+          "legendFormat": "failures",
           "datasource": {"type": "prometheus", "uid": "Prometheus"}
         }
       ]
@@ -136,7 +138,7 @@
     {
       "id": 4,
       "type": "timeseries",
-      "title": "Model Run Duration p95",
+      "title": "dbt run duration p95 by layer (target)",
       "datasource": {"type": "prometheus", "uid": "Prometheus"},
       "gridPos": {"h": 9, "w": 12, "x": 0, "y": 5},
       "options": {
@@ -160,8 +162,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (le, model_name) (rate(dbt_model_run_duration_seconds_bucket[$__rate_interval])))",
-          "legendFormat": "{{model_name}}",
+          "expr": "histogram_quantile(0.95, sum by (le, target) (rate(dataops_dbt_run_duration_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "{{target}}",
           "datasource": {"type": "prometheus", "uid": "Prometheus"}
         }
       ]
@@ -169,7 +171,7 @@
     {
       "id": 5,
       "type": "timeseries",
-      "title": "Failed Models Over Time",
+      "title": "Non-success dbt runs over time",
       "datasource": {"type": "prometheus", "uid": "Prometheus"},
       "gridPos": {"h": 9, "w": 12, "x": 12, "y": 5},
       "options": {
@@ -192,8 +194,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (model_name) (increase(dbt_model_failures_total[$__rate_interval]))",
-          "legendFormat": "{{model_name}}",
+          "expr": "sum by (target) (increase(dataops_dbt_run_outcome_total{status!=\"success\"}[$__rate_interval]))",
+          "legendFormat": "{{target}}",
           "datasource": {"type": "prometheus", "uid": "Prometheus"}
         }
       ]
@@ -201,7 +203,7 @@
     {
       "id": 6,
       "type": "bargauge",
-      "title": "Slowest Models (Top 10, p95)",
+      "title": "Slowest layers (Top 10, p95)",
       "datasource": {"type": "prometheus", "uid": "Prometheus"},
       "gridPos": {"h": 9, "w": 12, "x": 0, "y": 14},
       "options": {
@@ -223,8 +225,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "topk(10, histogram_quantile(0.95, sum by (le, model_name) (rate(dbt_model_run_duration_seconds_bucket[24h]))))",
-          "legendFormat": "{{model_name}}",
+          "expr": "topk(10, max by (target) (histogram_quantile(0.95, sum by (le, target) (rate(dataops_dbt_run_duration_seconds_bucket[24h]))))",
+          "legendFormat": "{{target}}",
           "instant": true,
           "datasource": {"type": "prometheus", "uid": "Prometheus"}
         }
@@ -233,7 +235,7 @@
     {
       "id": 7,
       "type": "table",
-      "title": "Top dbt Test Failures (24h)",
+      "title": "dbt test failure gauge by layer (target)",
       "datasource": {"type": "prometheus", "uid": "Prometheus"},
       "gridPos": {"h": 9, "w": 12, "x": 12, "y": 14},
       "options": {
@@ -250,7 +252,7 @@
           {
             "matcher": {"id": "byName", "options": "Value"},
             "properties": [
-              {"id": "displayName", "value": "Failures (24h)"},
+              {"id": "displayName", "value": "Failures"},
               {"id": "unit", "value": "short"},
               {"id": "custom.cellOptions", "value": {"type": "color-background", "mode": "gradient"}},
               {
@@ -273,15 +275,15 @@
           "id": "organize",
           "options": {
             "excludeByName": {"Time": true, "__name__": true, "instance": true, "job": true},
-            "indexByName": {"model_name": 0, "test_name": 1, "Value": 2},
-            "renameByName": {"model_name": "Model", "test_name": "Test"}
+            "indexByName": {"target": 0, "Value": 1},
+            "renameByName": {"target": "Layer (target)"}
           }
         }
       ],
       "targets": [
         {
           "refId": "A",
-          "expr": "topk(10, sum by (model_name, test_name) (increase(dbt_test_failures_total[24h])))",
+          "expr": "topk(10, sum by (target) (dataops_dbt_test_failures_total))",
           "format": "table",
           "instant": true,
           "datasource": {"type": "prometheus", "uid": "Prometheus"}

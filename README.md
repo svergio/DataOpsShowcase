@@ -23,13 +23,14 @@
 
 | Область | В репозитории |
 |--------|---------------|
-| Данные | [generators/](generators/) → Kafka, MinIO, PostgreSQL (OLTP) |
+| Данные | [generators/](generators/) эмулируют компанию в четыре sink ([docs/Generators.md](docs/Generators.md)); профиль по умолчанию — [configs/generators/company.generator.json](configs/generators/company.generator.json); запуск контейнера `docker compose --profile generators up -d data_generator` |
 | Хранение и витрины | PostgreSQL (схемы dbt: staging, vault, marts) — см. [docs/diagrams/dwh-schemas.md](docs/diagrams/dwh-schemas.md) |
 | Обработка | [spark/](spark/) (jobs, `common/`), [dbt/](dbt/) |
 | Оркестрация | [pipelines/](pipelines/) — Airflow DAG, datasets |
 | ML | [ml/](ml/) — обучение, фичи, вывод, MLflow |
 | Сервисы | [services/](services/) — dbt-web, общий Python |
 | Конфигурация | [configs/](configs/), [infra/](infra/) (ingress, мониторинг) |
+| Качество и мониторинг (DQC) | [monitoring/quality/](monitoring/quality/), [docs/QUALITY_AND_MONITORING.md](docs/QUALITY_AND_MONITORING.md), `make smoke` |
 | Документация | [docs/](docs/) — архитектура, API, дорожная карта, схемы |
 
 ---
@@ -75,6 +76,7 @@
 | `/airflow/` | Панель Airflow: DAG, ручной запуск, логи |
 | `/mlflow/` | MLflow: эксперименты и артефакты |
 | `/grafana/` | Grafana: дашборды (логин в `.env`) |
+| `/superset/` | Superset над OLAP (витрины `dwh_marts`; см. [docs/SUPERSET.md](docs/SUPERSET.md); либо порт `${SUPERSET_PORT}` напрямую) |
 | `/dbt-api/v1/health` | Проверка, что API dbt-web отвечает за ingress |
 
 **Логины и типичные поломки (404/502):** [docs/WEB_UI_ACCESS.md](docs/WEB_UI_ACCESS.md).  
@@ -94,6 +96,7 @@
 | [docs/Generators.md](docs/Generators.md) | Синтетика и источники |
 | [docs/business/](docs/business/) | Тексты для нетехнических читателей |
 | [docs/diagrams/](docs/diagrams/) | Схемы DWH, OLTP, Kafka, MinIO, Data Vault |
+| [docs/SUPERSET.md](docs/SUPERSET.md) | Superset: Postgres meta + DWH OLAP, bootstrap дашбордов |
 
 ---
 

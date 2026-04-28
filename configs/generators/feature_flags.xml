@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  OLTP seed for feature_flags + cadence for FEATURE_FLAG_EVALUATED Kafka telemetry.
+-->
+<generator name="feature_flags">
+  <volume>
+    <total>12</total>
+  </volume>
+  <limits>
+    <feature_eval_every_ticks>4</feature_eval_every_ticks>
+  </limits>
+  <flags>
+    <flag key="new_checkout_flow" name="New checkout flow" description="A/B test checkout" enabled="true" rollout="25">
+      <targeting>{"customer_segments": ["VIP", "REGULAR"]}</targeting>
+    </flag>
+    <flag key="crypto_payments" name="Cryptocurrency payments" description="" enabled="false" rollout="5">
+      <targeting>{"countries": ["US", "GB"]}</targeting>
+    </flag>
+    <flag key="ai_recommendations" name="AI recommendations" description="Fully rolled" enabled="true" rollout="100">
+      <targeting>{}</targeting>
+    </flag>
+    <extra_random_flags count="9" rollout_max="60"/>
+  </flags>
+</generator>

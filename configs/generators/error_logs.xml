@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MinIO telemetry JSONL error batches.
+-->
+<generator name="error_logs">
+  <limits>
+    <emit_every_ticks>7</emit_every_ticks>
+    <lines_per_emit>35</lines_per_emit>
+  </limits>
+  <error_type_weights>
+    <weight name="JAVASCRIPT_ERROR" value="0.60"/>
+    <weight name="API_ERROR" value="0.20"/>
+    <weight name="NETWORK_ERROR" value="0.10"/>
+    <weight name="PAYMENT_ERROR" value="0.05"/>
+    <weight name="RESOURCE_NOT_FOUND" value="0.03"/>
+    <weight name="TIMEOUT" value="0.02"/>
+  </error_type_weights>
+  <severity_weights>
+    <weight name="CRITICAL" value="0.05"/>
+    <weight name="ERROR" value="0.25"/>
+    <weight name="WARNING" value="0.45"/>
+    <weight name="INFO" value="0.25"/>
+  </severity_weights>
+  <common_error_messages>
+    <item>TypeError: Cannot read property &apos;price&apos; of undefined</item>
+    <item>NetworkError: Failed to fetch</item>
+    <item>PaymentGatewayError: Card declined</item>
+    <item>TimeoutError: Request took longer than 30s</item>
+    <item>404: Product not found</item>
+  </common_error_messages>
+</generator>

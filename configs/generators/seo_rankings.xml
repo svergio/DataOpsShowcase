@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MinIO: SEO weekly/daily CSV rank snapshots.
+-->
+<generator name="seo_rankings">
+  <limits>
+    <emit_every_ticks>6</emit_every_ticks>
+  </limits>
+  <search_engine_weights>
+    <weight name="Google" value="0.90"/>
+    <weight name="Bing" value="0.08"/>
+    <weight name="Yahoo" value="0.02"/>
+  </search_engine_weights>
+  <device_type_weights>
+    <weight name="DESKTOP" value="0.55"/>
+    <weight name="MOBILE" value="0.40"/>
+    <weight name="TABLET" value="0.05"/>
+  </device_type_weights>
+  <seo_rank_edge_cases>
+    <drop_out_pct>0.02</drop_out_pct>
+    <viral_spike_pct>0.01</viral_spike_pct>
+    <algo_drop_pct>0.03</algo_drop_pct>
+  </seo_rank_edge_cases>
+</generator>

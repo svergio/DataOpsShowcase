@@ -65,6 +65,7 @@ flowchart LR
 
 ## См. также
 
+- [../SUPERSET.md](../SUPERSET.md) — Superset к `dwh_marts`: подключения (metadb / OLAP), bootstrap, дашборды
 - [../ARCHITECTURE.md](../ARCHITECTURE.md) — монорепо
 - [../PROJECT_SUMMARY.md](../PROJECT_SUMMARY.md) — обзор стенда
 - [oltp-er.md](oltp-er.md) — **не** DWH, а источник OLTP

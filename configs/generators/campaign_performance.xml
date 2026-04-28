@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MinIO daily parquet rows per emit; CTR/CPC/CPA/ROAS from typed benchmarks.
+-->
+<generator name="campaign_performance">
+  <volume>
+    <rows_min>80</rows_min>
+    <rows_max>200</rows_max>
+  </volume>
+  <limits>
+    <emit_every_ticks>5</emit_every_ticks>
+  </limits>
+  <campaign_type_mix>
+    <weight name="EMAIL" value="30"/>
+    <weight name="GOOGLE_ADS" value="35"/>
+    <weight name="SOCIAL_ADS" value="35"/>
+  </campaign_type_mix>
+  <performance_benchmarks>
+    <campaign_type name="EMAIL">
+      <ctr min="0.02" max="0.05"/>
+      <conversion min="0.01" max="0.03"/>
+      <cpc min="0.10" max="0.50"/>
+    </campaign_type>
+    <campaign_type name="GOOGLE_ADS">
+      <ctr min="0.03" max="0.08"/>
+      <conversion min="0.02" max="0.05"/>
+      <cpc min="0.50" max="3.00"/>
+    </campaign_type>
+    <campaign_type name="SOCIAL_ADS">
+      <ctr min="0.01" max="0.03"/>
+      <conversion min="0.005" max="0.02"/>
+      <cpc min="0.30" max="2.00"/>
+    </campaign_type>
+  </performance_benchmarks>
+  <campaign_perf_edge_cases>
+    <overspend_pct>0.05</overspend_pct>
+    <zero_impressions_pct>0.03</zero_impressions_pct>
+    <negative_roas_pct>0.01</negative_roas_pct>
+    <high_ctr_anomaly_pct>0.02</high_ctr_anomaly_pct>
+  </campaign_perf_edge_cases>
+</generator>

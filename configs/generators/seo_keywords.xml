@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  OLTP seed: seo_keywords (categories, ranks, volumes).
+-->
+<generator name="seo_keywords">
+  <volume>
+    <total>1000</total>
+  </volume>
+  <keyword_category_weights>
+    <weight name="PRODUCT" value="0.40"/>
+    <weight name="BRAND" value="0.20"/>
+    <weight name="CATEGORY" value="0.25"/>
+    <weight name="INFORMATIONAL" value="0.10"/>
+    <weight name="TRANSACTIONAL" value="0.05"/>
+  </keyword_category_weights>
+  <rank_distribution>
+    <weight name="top_3" value="0.05"/>
+    <weight name="top_10" value="0.15"/>
+    <weight name="top_20" value="0.20"/>
+    <weight name="top_50" value="0.30"/>
+    <weight name="beyond" value="0.30"/>
+  </rank_distribution>
+  <search_volume_lognormal mean="7.0" sigma="1.5"/>
+  <keyword_prefixes>
+    <item>wireless headphones</item>
+    <item>gaming laptop</item>
+    <item>best smartphones</item>
+    <item>techmart deals</item>
+    <item>tablet deals</item>
+    <item>how to choose laptop</item>
+    <item>buy cheap tablet</item>
+  </keyword_prefixes>
+</generator>

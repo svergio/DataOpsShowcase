@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  OLTP seed: marketing_campaigns. Tune weights, budgets, duration mix, seasonality,
+  target_audience pools, edge-case rates.
+-->
+<generator name="marketing_campaigns">
+  <volume>
+    <total>500</total>
+    <monthly_new_min>10</monthly_new_min>
+    <monthly_new_max>20</monthly_new_max>
+  </volume>
+  <weights>
+    <weight name="EMAIL" value="0.30"/>
+    <weight name="GOOGLE_ADS" value="0.25"/>
+    <weight name="SOCIAL_ADS" value="0.20"/>
+    <weight name="DISPLAY" value="0.10"/>
+    <weight name="PUSH" value="0.08"/>
+    <weight name="SMS" value="0.05"/>
+    <weight name="AFFILIATE" value="0.02"/>
+  </weights>
+  <budget_ranges>
+    <range name="EMAIL" min="500" max="5000"/>
+    <range name="GOOGLE_ADS" min="5000" max="50000"/>
+    <range name="SOCIAL_ADS" min="3000" max="30000"/>
+    <range name="DISPLAY" min="2000" max="15000"/>
+    <range name="PUSH" min="300" max="2000"/>
+    <range name="SMS" min="500" max="3000"/>
+    <range name="AFFILIATE" min="1000" max="10000"/>
+  </budget_ranges>
+  <duration>
+    <bucket name="short" days_min="1" days_max="7" weight="0.40"/>
+    <bucket name="medium" days_min="7" days_max="28" weight="0.45"/>
+    <bucket name="long" days_min="28" days_max="90" weight="0.15"/>
+  </duration>
+  <seasonality>
+    <month n="6" mult="2.0"/>
+    <month n="7" mult="2.0"/>
+    <month n="8" mult="3.0"/>
+    <month n="9" mult="3.0"/>
+    <month n="11" mult="10.0"/>
+    <month n="12" mult="5.0"/>
+  </seasonality>
+  <edge_cases>
+    <zero_budget_pct>0.05</zero_budget_pct>
+    <invert_dates_pct>0.02</invert_dates_pct>
+    <long_campaign_pct>0.03</long_campaign_pct>
+  </edge_cases>
+  <age_ranges>
+    <item>18-34</item>
+    <item>25-45</item>
+    <item>35-54</item>
+  </age_ranges>
+  <countries_pool>
+    <item>US</item>
+    <item>GB</item>
+    <item>CA</item>
+    <item>DE</item>
+    <item>FR</item>
+  </countries_pool>
+  <interests_pool>
+    <item>technology</item>
+    <item>gadgets</item>
+    <item>gaming</item>
+    <item>smart home</item>
+  </interests_pool>
+  <customer_segments>
+    <item>VIP</item>
+    <item>REGULAR</item>
+  </customer_segments>
+  <device_preferences>
+    <item>MOBILE</item>
+    <item>DESKTOP</item>
+  </device_preferences>
+</generator>

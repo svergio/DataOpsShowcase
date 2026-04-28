@@ -2,7 +2,7 @@
 
 **Зачем:** увидеть, какие **потоки событий** питают ingestion, и как сущности связаны на уровне **логики** (не низкоуровневого протокола).
 
-**Генератор** пишет в топики, имена по умолчанию задаются в [generators/common/config.py](../../generators/common/config.py) и в `.env` (например `KAFKA_TOPIC_ORDERS`, `KAFKA_BOOTSTRAP_SERVERS`).
+**Генератор** пишет в топики; имена по умолчанию заданы в [configs/generators/company.generator.json](../../configs/generators/company.generator.json) и подхватываются в [generators/common/config.py](../../generators/common/config.py). Переменные окружения (`KAFKA_TOPIC_*`, `KAFKA_BOOTSTRAP_SERVERS`) перекрывают JSON при необходимости.
 
 **См. также:** [../Generators.md](../Generators.md), [../PIPELINES.md](../PIPELINES.md) (ingestion DAG).
 
@@ -113,3 +113,14 @@ erDiagram
 - `ORDER_EVENT.order_id` ↔ `PAYMENT_EVENT.order_id` ↔ `SHIPMENT_EVENT.order_id`.
 - `CLICKSTREAM_EVENT.customer_id` ↔ `ORDER_EVENT.customer_id`.
 - `ORDER_EVENT.items[*].product_id` ↔ записи в OLTP `products.product_id`.
+
+## Расширенные топики (генератор)
+
+Имена по умолчанию задаются в [.env.example](../../.env.example) / [generators/common/config.py](../../generators/common/config.py):
+
+| Топик (default) | Назначение |
+|-----------------|------------|
+| `techmart.marketing.email_events` | События email вокруг кампаний (JSON) |
+| `techmart.seo.organic_sessions` | Органические сессии по поиску (JSON) |
+| `techmart.hr.time_tracking` | Учёт времени (clock in/out) |
+| `techmart.features.evaluated` | Оценка feature flags по пользователю |

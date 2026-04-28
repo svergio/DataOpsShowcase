@@ -67,6 +67,7 @@ flowchart LR
 - `meta.dq_results` хранит результаты DQ-проверок.
 - Представления: `meta.v_pipeline_runs_recent`, `meta.v_pipeline_runs_summary`, `meta.v_dq_recent`.
 - Логи: структурированный JSON (`services/common/logging_utils.JsonFormatter`).
+- Отдельный контур DQC и чек-листы: [QUALITY_AND_MONITORING.md](QUALITY_AND_MONITORING.md), каталог [monitoring/quality/](../monitoring/quality/).
 
 ## Надёжность
 

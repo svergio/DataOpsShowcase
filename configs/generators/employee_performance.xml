@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MinIO quarterly HR review CSV; rating distribution (1-5).
+-->
+<generator name="employee_performance">
+  <limits>
+    <emit_every_ticks>100</emit_every_ticks>
+    <reviews_per_emit>250</reviews_per_emit>
+  </limits>
+  <rating_weights>
+    <weight name="1" value="0.03"/>
+    <weight name="2" value="0.12"/>
+    <weight name="3" value="0.45"/>
+    <weight name="4" value="0.30"/>
+    <weight name="5" value="0.10"/>
+  </rating_weights>
+</generator>

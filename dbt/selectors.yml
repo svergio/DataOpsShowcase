@@ -1,0 +1,6 @@
+selectors:
+  - name: dqc_all_tests
+    description: All generic tests (store_failures in dwh_dq per project config)
+    definition:
+      method: resource_type
+      value: test

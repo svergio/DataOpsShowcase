@@ -154,3 +154,26 @@ def record_freshness_lag(*, source: str, table: str, lag_seconds: float) -> None
         return
     g.labels(source=source, table=table).set(max(0.0, lag_seconds))
     _push(job="airflow_freshness", grouping_key={"source": source, "table": table})
+
+
+def record_airflow_task_outcome(*, dag_id: str, task_id: str, success: bool) -> None:
+    name = "dag_success" if success else "dag_failure"
+    doc = "Airflow task finished successfully" if success else "Airflow task failed"
+    c = _counter(name, doc, ("dag_id", "task_id"))
+    if c is None:
+        return
+    c.labels(dag_id=dag_id, task_id=task_id).inc()
+    _push(job="airflow_task_outcomes")
+
+
+def record_airflow_task_duration(*, dag_id: str, task_id: str, duration_seconds: float) -> None:
+    h = _histogram(
+        "task_duration_seconds",
+        "Airflow task duration in seconds",
+        ("dag_id", "task_id"),
+        buckets=(0.1, 0.5, 1, 5, 30, 60, 120, 300, 600, 1800),
+    )
+    if h is None:
+        return
+    h.labels(dag_id=dag_id, task_id=task_id).observe(max(0.0, float(duration_seconds)))
+    _push(job="airflow_task_durations")

@@ -2,7 +2,7 @@
 
 **Зачем:** понять, как **файловый сырой слой** устроен в bucket (S3-совместимый API), до того как Airflow/Spark заберут данные в БД.
 
-**Bucket** `MINIO_BUCKET_RAW` (часто `techmart-data`) и **префиксы** задаются в [generators/common/config.py](../../generators/common/config.py). Периодическая выгрузка в объекты зависит от `GENERATOR_MINIO_BATCH_TICKS` и логики [generators/generator.py](../../generators/generator.py).
+**Bucket** `MINIO_BUCKET_RAW` (часто `techmart-data`) и **префиксы** по умолчанию — в [configs/generators/company.generator.json](../../configs/generators/company.generator.json) и в [generators/common/config.py](../../generators/common/config.py); env (`MINIO_*`, `GENERATOR_MINIO_BATCH_TICKS`) может перекрыть профиль. Периодическая выгрузка зависит от `minio_batch_ticks` в JSON/env и от логики [generators/generator.py](../../generators/generator.py).
 
 **См. также:** [../Generators.md](../Generators.md).
 
@@ -79,6 +79,18 @@ erDiagram
         string updated_at
     }
 ```
+
+## Расширенные префиксы (генератор)
+
+Дополнительно к базовым префиксам (см. конфиг `MINIO_PREFIX_*`):
+
+| Префикс | Формат | Содержание |
+|---------|--------|------------|
+| `raw/marketing/campaign_performance` | `YYYY/MM/DD/*.parquet` | Метрики производительности кампаний |
+| `raw/seo/rankings` | `YYYY/MM/*.csv` | Позиции ключевых слов по дням |
+| `raw/telemetry/performance` | `YYYY/MM/DD/*.parquet` | Web Vitals |
+| `raw/telemetry/errors` | `YYYY/MM/DD/*.jsonl` | Ошибки клиента |
+| `raw/hr/performance` | `YYYY/Q{n}/*.csv` | Квартальные ревью |
 
 ## Партиционирование
 

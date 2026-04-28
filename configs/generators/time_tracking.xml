@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Kafka: HR time clock / break events.
+-->
+<generator name="time_tracking">
+  <throughput>
+    <events_per_tick_min>2</events_per_tick_min>
+    <events_per_tick_max>12</events_per_tick_max>
+  </throughput>
+  <time_event_types>
+    <item>CLOCK_IN</item>
+    <item>CLOCK_OUT</item>
+    <item>BREAK_START</item>
+    <item>BREAK_END</item>
+  </time_event_types>
+  <office_codes>
+    <item>NYC-HQ</item>
+    <item>LON-HUB</item>
+    <item>REMOTE</item>
+    <item>BER-OFFICE</item>
+  </office_codes>
+</generator>

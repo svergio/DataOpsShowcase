@@ -1,99 +1,127 @@
 # Генераторы синтетических данных (TechMart)
 
-Документ описывает **что** генерирует стенд, **куда** пишет и **как** с этим согласованы диаграммы. Полные **DDL** таблиц **не** дублируются: они в SQL-инициализации Postgres и в Mermaid-файлах (см. [diagrams/](diagrams/README.md)).
+**Bounded context генератора** отвечает только за **эмиссию синтетических данных** в **четыре назначения**: PostgreSQL **OLTP**, **Kafka**, **Redis**, **MinIO**. Внутренние преобразования при генерации (агрегации, распределения, сборка payload) входят в этот контур.
 
-## Зачем это нужно
+**Вне контура** остаётся ETL/ELT: Airflow, Spark, dbt и загрузка в DWH/OLAP (`postgres_olap`). Генератор **не** пишет в OLAP и не управляет dbt; витрины описаны в [diagrams/dwh-schemas.md](diagrams/dwh-schemas.md), [diagrams/data_vault_flow.md](diagrams/data_vault_flow.md), [PIPELINES.md](PIPELINES.md).
 
-Без «живых» данных не проверить ingestion, Spark, dbt, мониторинг. Генераторы создают **согласованный сюжет** маркетплейса: пользователи, продавцы, товары, заказы, платежи, кликстрим, доставки, часть файлов в MinIO.
-
-## Обзор потока
+## Схема потоков
 
 ```mermaid
 flowchart LR
-  G[generators/generator.py]
-  G --> O[PostgreSQL OLTP]
-  G --> K[Kafka topics]
-  G --> M[MinIO bucket]
-  G --> R[Redis pub/stream optional]
+  subgraph generators_bc [Generators bounded_context]
+    App[StreamingApplication]
+    Ext[SyntheticExtensions]
+  end
+  postgres_oltp[(postgres_oltp)]
+  kafka[(Kafka)]
+  redis[(Redis)]
+  minio[(MinIO)]
+  App --> postgres_oltp
+  App --> kafka
+  App --> redis
+  App --> minio
+  Ext --> postgres_oltp
+  Ext --> kafka
+  Ext --> redis
+  Ext --> minio
 ```
 
-Тот же смысл текстом:
+Источник истины по транзакционным сущностям для демо — **OLTP**. Kafka и MinIO несут события и файловые артефакты для ingestion downstream.
 
-- **OLTP** — нормализованные заказы, позиции, сущности-справочники.
-- **Kafka** — потоки событий (заказы, оплаты, кликстрим, доставки).
-- **MinIO** — «сырые» файлы (каталог, возвраты, вложения к платежам — по сценарию).
-- **Redis** (если включён) — публикация/стримы для сценариев с pub/sub (см. конфиг).
+## Конфигурация: JSON, XML, переменные окружения
 
-## Код: откуда читать
+| Слой | Файл / механизм | Содержание |
+|------|-----------------|------------|
+| Профиль «компания» | [configs/generators/company.generator.json](../configs/generators/company.generator.json) | Режим тиков, сиды, объёмы per tick, включатели sink’ов, имена топиков/каналов/prefixes (**без секретов**) |
+| Сценарные распределения | [configs/generators/*.xml](../configs/generators/) | Веса, XML-лимиты для расширений (маркетинг, SEO, HR и т.д.), монтируется в контейнер как `/app/configs/generators` |
+| Секреты и DSN | `.env` / compose | `OLTP_DSN`, `KAFKA_*`, `REDIS_URL`, ключи MinIO |
+| Одноразовый overlay без файла | `GENERATOR_SETTINGS_JSON` | Одна строка JSON-объекта; поверх содержимого, загруженного из `GENERATOR_SETTINGS_FILE` / `company.generator.json` |
+
+**Порядок склейки профиля (до чтения per-field env в `load_config`):** базовые дефолты в коде (`_baseline`) меньше **файлового JSON** (`GENERATOR_SETTINGS_FILE`, иначе `GENERATOR_CONFIG_DIR/company.generator.json`) меньше **`GENERATOR_SETTINGS_JSON`** меньше **meta-store** (`generator.config_overrides` при включённом store).
+
+**Пофилдовый приоритет в рантайме:** для каждого поля `Config` **непустая переменная окружения перекрывает merged-профиль** ([generators/common/config.py](../generators/common/config.py)). Пустая строка в env не перекрывает (остаётся merged).
+
+**Docker Compose:** переменные с хоста попадают в контейнер `data_generator` только если они **перечислены** в `environment` сервиса (или через `env_file`). Ключи из корневого `.env`, используемые только как `${VAR}` в compose, сами по себе **не пробрасываются** — для override без правки JSON добавьте нужные переменные в блок `environment` образца [docker-compose.yml](../docker-compose.yml) или используйте смонтированный `company.generator.json`.
+
+**Опциональный meta-store:** при `GENERATOR_USE_META_STORE=true` и непустом `GENERATOR_META_DSN` после JSON подмешивается объект из столбца `settings` таблицы `generator.config_overrides` (профиль `GENERATOR_PROFILE`, по умолчанию `default`). Если флаг включён, а `GENERATOR_META_DSN` пустой, выполняется только предупреждение в логе; работа продолжается от JSON/meta без БД. Схема: [services/postgres/init/06_generator_meta.sql](../services/postgres/init/06_generator_meta.sql) на базе `postgres_metadb`.
+
+Перечень ключей merged-профиля и имён переменных — в [generators/common/config.py](../generators/common/config.py).
+
+## Структура пакета (слои)
+
+| Слой | Назначение | Пути |
+|------|------------|------|
+| `domain` | Константы и чистая логика без I/O | `generators/domain/` |
+| `application` | Оркестрация тика, `StreamingGenerator`, расширения по поддоменам (mixins) | `generators/application/` |
+| `infrastructure` | Коннекторы, загрузка XML/JSON-профиля | `generators/infrastructure/` |
+| `interfaces` | Точка входа CLI | `generators/interfaces/cli.py`, корневой [generators/generator.py](../generators/generator.py) |
+
+Расширенные сценарии собраны в [generators/application/extensions/](../generators/application/extensions/) (маркетинг, SEO, HR, телеметрия, finance). [generators/extra/runner.py](../generators/extra/runner.py) — тонкий реэкспорт для обратной совместимости.
+
+## Код и DDL: откуда читать
 
 | Путь | Содержание |
 |------|------------|
-| [generators/generator.py](../generators/generator.py) | Основной цикл `StreamingGenerator`, tick, остановка |
-| [generators/common/config.py](../generators/common/config.py) | Переменные окружения, значения по умолчанию |
-| [generators/common/connectors/oltp.py](../generators/common/connectors/oltp.py) | Запись в OLTP |
-| [generators/common/connectors/kafka_producer.py](../generators/common/connectors/kafka_producer.py) | Публикация в Kafka |
-| [generators/common/connectors/minio_uploader.py](../generators/common/connectors/minio_uploader.py) | Загрузка объектов |
-| [generators/kafka/*.py](../generators/kafka/) | Отдельные сценарии/генераторы по каналам (при необходимости) |
-| [services/postgres/init/02_oltp_schema.sql](../services/postgres/init/02_oltp_schema.sql) | Фактическая схема OLTP (источник правды по DDL) |
-
-## Переменные окружения (основные)
-
-Список и дефолты — в [generators/common/config.py](../generators/common/config.py). Типовые:
-
-| Группа | Примеры переменных | Смысл |
-|--------|-------------------|--------|
-| Режим | `GENERATOR_MODE`, `GENERATOR_TICK_SECONDS` | Скорость тиков, режим `streaming` |
-| Объёмы | `GENERATOR_SEED_*`, `GENERATOR_ORDERS_PER_TICK_*`, `GENERATOR_CLICKS_PER_TICK_*` | Сколько сущностей в справочнике и в одном тике |
-| Включатели | `GENERATOR_ENABLE_OLTP`, `GENERATOR_ENABLE_KAFKA`, `GENERATOR_ENABLE_MINIO`, `GENERATOR_ENABLE_REDIS` | Куда писать |
-| Kafka | `KAFKA_BOOTSTRAP_SERVERS`, `KAFKA_TOPIC_CLICKSTREAM`, `KAFKA_TOPIC_ORDERS`, `KAFKA_TOPIC_PAYMENTS`, `KAFKA_TOPIC_SHIPMENTS` | Брокер и имена топиков |
-| MinIO | `MINIO_*` | Эндпоинт, ключи, bucket, префиксы |
-| OLTP | `OLTP_DSN` | Строка подключения к `postgres_oltp` |
-
-Точные имена переменных в вашем стенде — в `.env.example`.
+| [generators/generator.py](../generators/generator.py) | Вход: `main()` |
+| [generators/application/streaming_generator.py](../generators/application/streaming_generator.py) | Цикл `StreamingGenerator` |
+| [generators/common/config.py](../generators/common/config.py) | `load_config()`, merge JSON / meta / env |
+| [generators/infrastructure/settings/company_profile.py](../generators/infrastructure/settings/company_profile.py) | Загрузка JSON и meta-store |
+| [generators/common/connectors/](../generators/common/connectors/) | Реэкспорт коннекторов (реализация в `infrastructure/connectors/`) |
+| [services/postgres/init/02_oltp_schema.sql](../services/postgres/init/02_oltp_schema.sql) | OLTP DDL |
+| [services/postgres/init/02b_oltp_marketing_hr_finance.sql](../services/postgres/init/02b_oltp_marketing_hr_finance.sql) | Расширения OLTP |
 
 ## Соответствие диаграммам
 
-| Система | Документация в репо |
-|---------|-------------------|
-| DWH (схемы dbt, meta) | [diagrams/dwh-schemas.md](diagrams/dwh-schemas.md) |
-| OLTP (ER) | [diagrams/oltp-er.md](diagrams/oltp-er.md) |
-| Kafka (топики/события) | [diagrams/kafka-er.md](diagrams/kafka-er.md) |
-| MinIO (префиксы/объекты) | [diagrams/minio-er.md](diagrams/minio-er.md) |
+| Система | Документация |
+|---------|--------------|
+| OLTP | [diagrams/oltp-er.md](diagrams/oltp-er.md) |
+| Kafka | [diagrams/kafka-er.md](diagrams/kafka-er.md) — имена топиков по умолчанию согласованы с `company.generator.json` |
+| MinIO | [diagrams/minio-er.md](diagrams/minio-er.md) — префиксы согласованы с `company.generator.json` |
+| DWH (вне генератора) | [diagrams/dwh-schemas.md](diagrams/dwh-schemas.md) |
 
-Имена топиков и бакетов в диаграммах должны **совпадать** с `Config` в `common/config.py` и с `.env`, иначе ingestion «не увидит» данные.
+## Запуск в Docker Compose
 
-## Какие данные по каналам (смысл)
+Сервис **`data_generator`** в профиле `generators`: к образу монтируется только `./configs/generators`. Пример: `docker compose --profile generators up -d data_generator`. Профиль компании задаётся файлом `GENERATOR_SETTINGS_FILE` (по умолчанию путь к `company.generator.json` внутри mount). В `docker-compose.yml` явно проброшен набор переменных (`${VAR:-}`), чтобы ключи из `.env` могли переопределить профиль без правки только JSON. Код генератора берётся из образа; для live-разработки можно добавить bind-mount `./generators:/app` в локальном override.
 
-### OLTP (PostgreSQL)
+**Если контейнер «unhealthy»:** healthcheck проверяет наличие `/tmp/generator.alive`, который записывается в `StreamingGenerator.run()` после успешной инициализации коннекторов и сидирования. Если падение произошло **до** первого heartbeat (например, при `seed_reference`), файл не создаётся и контейнер остаётся unhealthy до правки конфигурации или перезапуска.
 
-- Справочники: пользователи, продавцы, товары, категории.
-- Транзакции: заказы, строки заказа, оплаты (по сценарию).
-- **Проверка:** сравнить схему с [02_oltp_schema.sql](../services/postgres/init/02_oltp_schema.sql) и ER-диаграммой.
+## Каналы данных (смысл)
+
+### OLTP
+
+Справочники, заказы, расширения (кампании, SEO-ключи, сотрудники, feature flags, GL) — см. SQL-инициализацию.
 
 ### Kafka
 
-- **Заказы** — события оформления/изменения.
-- **Платежи** — движения по оплатам.
-- **Кликстрим** — просмотры, воронка, трафик.
-- **Доставки** — статусы/трек (по настройке).
+События заказов, платежей, кликстрима, доставок и потоков расширений.
 
-**Проверка:** `kafka-console-consumer` или UI брокера; имена топиков — в конфиге и [kafka-er.md](diagrams/kafka-er.md).
+### MinIO
 
-### MinIO (S3 API)
+Сырьевые файлы (каталог, возвраты, платежи — по сценарию) и parquet/csv/jsonl из расширений.
 
-- Пакетные/файловые **сырьевые** зоны: выгрузки, каталог, возвраты.
-- **Проверка:** список объектов в bucket, путь = префикс из конфига; см. [minio-er.md](diagrams/minio-er.md).
+### Redis
 
-## Примеры сценариев проверки
+Pub/stream и при расширениях — hash с агрегатами web vitals.
 
-1. **Только Kafka:** отключить OLTP/Minio в `GENERATOR_ENABLE_*`, убедиться, что в топиках растёт offset, затем смотреть Airflow raw-ingestion.
-2. **E2E:** оставить все каналы, пройти [PIPELINES.md](PIPELINES.md) до marts, сверить фактическое число строк в витрине с ожидаемым порядком величин.
-3. **Свежесть:** уменьшить `GENERATOR_TICK_SECONDS` для нагрузочного сценария (осторожно в слабой среде).
+## Проверка
 
-## Связь с dbt / Data Vault
+1. Только Kafka: в JSON или env отключить `enable_oltp` / `enable_minio` и проверить рост offset.
+2. E2E: см. [PIPELINES.md](PIPELINES.md) — цепочка ingestion → DWH выполняется **вне** генератора.
 
-Генераторы питают **нижние** слои; дальше данные идут по [diagrams/data_vault_flow.md](diagrams/data_vault_flow.md) и [PIPELINES.md](PIPELINES.md). Для бизнес-логики сценариев — [business/use_cases.md](business/use_cases.md).
+## Тесты
+
+- **Юнит:** `pytest tests/unit` — конфигурация (`load_config`, merge JSON), `company_profile`, доменные хелперы, разбор XML без сетевых вызовов. См. [SETUP.md](SETUP.md).
+- **Интеграция (опционально):** `pytest tests/integration -m integration` при заданных `GENERATOR_IT_*` (см. [SETUP.md](SETUP.md)); без стека тесты помечаются `skip`.
+
+## Roadmap (вне текущего обязательного scope)
+
+Идеи для будущих итераций (документирование демо CV/analytics):
+
+1. **Синтетическая «транскрипция» звонков** — шаблонные тексты, метаданные и складывание в MinIO и/или Kafka для NLP-пайплайнов.
+2. **Синтетические PDF платёжек / квитанций** — бинарные объекты в MinIO (и при необходимости ссылки в OLTP/Kafka) для офисных/analyst сценариев.
+
+Ограничения: генератор по-прежнему не пишет в `postgres_olap`; связка с dbt/Airflow остаётся в контуре оркестрации, не в коде генератора.
 
 ---
 
-*Старые версии документа с десятками страниц DDL заменены на ссылки к фактическим схемам: так проще не разъехаться с миграциями в Git.*
+*DDL таблиц не дублируются здесь целиком — см. SQL в репозитории и Mermaid в [diagrams/](diagrams/README.md).*

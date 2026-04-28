@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  OLTP: employees (~startup size); departments, levels, remote mix, salaries.
+-->
+<generator name="employees">
+  <volume>
+    <total>250</total>
+  </volume>
+  <department_weights>
+    <weight name="ENGINEERING" value="0.35"/>
+    <weight name="PRODUCT" value="0.08"/>
+    <weight name="MARKETING" value="0.12"/>
+    <weight name="SALES" value="0.15"/>
+    <weight name="OPERATIONS" value="0.10"/>
+    <weight name="CUSTOMER_SUPPORT" value="0.12"/>
+    <weight name="DATA" value="0.05"/>
+    <weight name="FINANCE" value="0.02"/>
+    <weight name="HR" value="0.01"/>
+  </department_weights>
+  <engineering_level_weights>
+    <weight name="JUNIOR" value="0.25"/>
+    <weight name="MID" value="0.40"/>
+    <weight name="SENIOR" value="0.25"/>
+    <weight name="LEAD" value="0.08"/>
+    <weight name="PRINCIPAL" value="0.02"/>
+  </engineering_level_weights>
+  <level_weights>
+    <weight name="JUNIOR" value="0.35"/>
+    <weight name="MID" value="0.40"/>
+    <weight name="SENIOR" value="0.15"/>
+    <weight name="LEAD" value="0.07"/>
+    <weight name="PRINCIPAL" value="0.03"/>
+  </level_weights>
+  <remote_status_weights>
+    <weight name="FULL_REMOTE" value="0.40"/>
+    <weight name="HYBRID" value="0.45"/>
+    <weight name="OFFICE" value="0.15"/>
+  </remote_status_weights>
+  <salary_ranges>
+    <department name="ENGINEERING">
+      <level name="JUNIOR" min="60000" max="90000"/>
+      <level name="MID" min="90000" max="130000"/>
+      <level name="SENIOR" min="130000" max="180000"/>
+      <level name="LEAD" min="180000" max="250000"/>
+      <level name="PRINCIPAL" min="250000" max="350000"/>
+    </department>
+    <department name="DATA">
+      <level name="JUNIOR" min="70000" max="95000"/>
+      <level name="MID" min="95000" max="140000"/>
+      <level name="SENIOR" min="140000" max="190000"/>
+      <level name="LEAD" min="190000" max="270000"/>
+      <level name="PRINCIPAL" min="270000" max="380000"/>
+    </department>
+    <department name="MARKETING">
+      <level name="JUNIOR" min="50000" max="75000"/>
+      <level name="MID" min="75000" max="110000"/>
+      <level name="SENIOR" min="110000" max="150000"/>
+      <level name="LEAD" min="150000" max="190000"/>
+      <level name="PRINCIPAL" min="190000" max="240000"/>
+    </department>
+  </salary_ranges>
+  <first_names>
+    <item>Anna</item>
+    <item>Max</item>
+    <item>Lena</item>
+    <item>Dan</item>
+    <item>Ivy</item>
+    <item>Owen</item>
+    <item>Mia</item>
+  </first_names>
+  <last_names>
+    <item>Smith</item>
+    <item>Nguyen</item>
+    <item>Garcia</item>
+    <item>Khan</item>
+    <item>Lopez</item>
+    <item>Deng</item>
+    <item>Berg</item>
+  </last_names>
+</generator>

@@ -12,6 +12,7 @@ services:
     volumes:
       - pg_oltp_data:/var/lib/postgresql/data
       - ./services/postgres/init/02_oltp_schema.sql:/docker-entrypoint-initdb.d/02_oltp_schema.sql:ro
+      - ./services/postgres/init/02b_oltp_marketing_hr_finance.sql:/docker-entrypoint-initdb.d/02b_oltp_marketing_hr_finance.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${PG_OLTP_USER} -d ${PG_OLTP_DB}"]
       interval: 10s
@@ -56,6 +57,7 @@ services:
     volumes:
       - pg_meta_data:/var/lib/postgresql/data
       - ./services/postgres/init/01_create_databases.sql:/docker-entrypoint-initdb.d/01_create_databases.sql:ro
+      - ./services/postgres/init/06_generator_meta.sql:/docker-entrypoint-initdb.d/06_generator_meta.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${PG_META_USER} -d ${PG_META_DB}"]
       interval: 10s
@@ -410,7 +412,12 @@ services:
       - dataops_net
 
   superset_init:
-    image: apache/superset:${SUPERSET_IMAGE_TAG}
+    build:
+      context: ./services/superset
+      dockerfile: Dockerfile
+      args:
+        SUPERSET_IMAGE_TAG: ${SUPERSET_IMAGE_TAG:-latest}
+    image: techmart/superset:dataops-local
     container_name: superset_init
     restart: "no"
     environment:
@@ -421,39 +428,48 @@ services:
       SUPERSET_ADMIN_FIRSTNAME: Data
       SUPERSET_ADMIN_LASTNAME: Ops
       SUPERSET_ADMIN_EMAIL: admin@example.com
-      SQLALCHEMY_DATABASE_URI: sqlite:////app/superset_home/superset.db
+      SQLALCHEMY_DATABASE_URI: postgresql+psycopg2://${PG_META_USER}:${PG_META_PASSWORD}@postgres_metadb:5432/${SUPERSET_DB_NAME:-superset}
+      SUPERSET_DWH_DATABASE_URI: postgresql+psycopg2://${PG_OLAP_USER}:${PG_OLAP_PASSWORD}@postgres_olap:5432/${PG_OLAP_DB:-techmart_dwh}
       PYTHONPATH: /home/superset/.local/lib/python3.10/site-packages
     command: >
       /bin/sh -c "
       superset db upgrade &&
       superset fab create-admin --username $$SUPERSET_ADMIN_USERNAME --password $$SUPERSET_ADMIN_PASSWORD --firstname $$SUPERSET_ADMIN_FIRSTNAME --lastname $$SUPERSET_ADMIN_LASTNAME --email $$SUPERSET_ADMIN_EMAIL &&
-      superset init
+      superset init &&
+      python /app/pythonpath/superset_bootstrap.py
       "
     volumes:
       - ./configs/app/superset_config.py:/app/pythonpath/superset_config.py:ro
+      - ./configs/app/superset_bootstrap.py:/app/pythonpath/superset_bootstrap.py:ro
       - superset_home:/app/superset_home
     depends_on:
       postgres_metadb:
+        condition: service_healthy
+      postgres_olap:
         condition: service_healthy
     networks:
       - dataops_net
 
   superset:
-    image: apache/superset:${SUPERSET_IMAGE_TAG}
+    image: techmart/superset:dataops-local
     container_name: superset
     restart: unless-stopped
     environment:
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
       SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
-      SQLALCHEMY_DATABASE_URI: sqlite:////app/superset_home/superset.db
+      SQLALCHEMY_DATABASE_URI: postgresql+psycopg2://${PG_META_USER}:${PG_META_PASSWORD}@postgres_metadb:5432/${SUPERSET_DB_NAME:-superset}
+      SUPERSET_DWH_DATABASE_URI: postgresql+psycopg2://${PG_OLAP_USER}:${PG_OLAP_PASSWORD}@postgres_olap:5432/${PG_OLAP_DB:-techmart_dwh}
       PYTHONPATH: /home/superset/.local/lib/python3.10/site-packages
     command: ["/bin/sh", "-c", "superset run -h 0.0.0.0 -p 8088"]
     ports:
       - "${SUPERSET_PORT}:8088"
     volumes:
       - ./configs/app/superset_config.py:/app/pythonpath/superset_config.py:ro
+      - ./configs/app/superset_bootstrap.py:/app/pythonpath/superset_bootstrap.py:ro
       - superset_home:/app/superset_home
     depends_on:
+      postgres_metadb:
+        condition: service_healthy
       superset_init:
         condition: service_completed_successfully
     healthcheck:
@@ -526,48 +542,65 @@ services:
 
   data_generator:
     build:
-      context: ./generators
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: generators/Dockerfile
     image: techmart/data-generator:local
     container_name: data_generator
     restart: unless-stopped
     profiles: ["generators"]
+    volumes:
+      - ./configs/generators:/app/configs/generators:ro
     environment:
-      GENERATOR_MODE: ${GENERATOR_MODE}
-      GENERATOR_TICK_SECONDS: ${GENERATOR_TICK_SECONDS}
-      GENERATOR_SEED: ${GENERATOR_SEED}
-      GENERATOR_SEED_USERS: ${GENERATOR_SEED_USERS}
-      GENERATOR_SEED_SELLERS: ${GENERATOR_SEED_SELLERS}
-      GENERATOR_SEED_PRODUCTS: ${GENERATOR_SEED_PRODUCTS}
-      GENERATOR_ORDERS_PER_TICK_MIN: ${GENERATOR_ORDERS_PER_TICK_MIN}
-      GENERATOR_ORDERS_PER_TICK_MAX: ${GENERATOR_ORDERS_PER_TICK_MAX}
-      GENERATOR_CLICKS_PER_TICK_MIN: ${GENERATOR_CLICKS_PER_TICK_MIN}
-      GENERATOR_CLICKS_PER_TICK_MAX: ${GENERATOR_CLICKS_PER_TICK_MAX}
-      GENERATOR_MINIO_BATCH_TICKS: ${GENERATOR_MINIO_BATCH_TICKS}
-      GENERATOR_ENABLE_OLTP: ${GENERATOR_ENABLE_OLTP}
-      GENERATOR_ENABLE_KAFKA: ${GENERATOR_ENABLE_KAFKA}
-      GENERATOR_ENABLE_REDIS: ${GENERATOR_ENABLE_REDIS}
-      GENERATOR_ENABLE_MINIO: ${GENERATOR_ENABLE_MINIO}
+      GENERATOR_CONFIG_DIR: ${GENERATOR_CONFIG_DIR:-/app/configs/generators}
+      GENERATOR_SETTINGS_FILE: ${GENERATOR_SETTINGS_FILE:-/app/configs/generators/company.generator.json}
+      GENERATOR_SETTINGS_JSON: ${GENERATOR_SETTINGS_JSON:-}
+      GENERATOR_MODE: ${GENERATOR_MODE:-}
+      GENERATOR_TICK_SECONDS: ${GENERATOR_TICK_SECONDS:-}
+      GENERATOR_SEED: ${GENERATOR_SEED:-}
+      GENERATOR_SEED_USERS: ${GENERATOR_SEED_USERS:-}
+      GENERATOR_SEED_SELLERS: ${GENERATOR_SEED_SELLERS:-}
+      GENERATOR_SEED_PRODUCTS: ${GENERATOR_SEED_PRODUCTS:-}
+      GENERATOR_ORDERS_PER_TICK_MIN: ${GENERATOR_ORDERS_PER_TICK_MIN:-}
+      GENERATOR_ORDERS_PER_TICK_MAX: ${GENERATOR_ORDERS_PER_TICK_MAX:-}
+      GENERATOR_CLICKS_PER_TICK_MIN: ${GENERATOR_CLICKS_PER_TICK_MIN:-}
+      GENERATOR_CLICKS_PER_TICK_MAX: ${GENERATOR_CLICKS_PER_TICK_MAX:-}
+      GENERATOR_MINIO_BATCH_TICKS: ${GENERATOR_MINIO_BATCH_TICKS:-}
+      GENERATOR_ENABLE_OLTP: ${GENERATOR_ENABLE_OLTP:-}
+      GENERATOR_ENABLE_KAFKA: ${GENERATOR_ENABLE_KAFKA:-}
+      GENERATOR_ENABLE_REDIS: ${GENERATOR_ENABLE_REDIS:-}
+      GENERATOR_ENABLE_MINIO: ${GENERATOR_ENABLE_MINIO:-}
+      GENERATOR_ENABLE_EXTENSIONS: ${GENERATOR_ENABLE_EXTENSIONS:-}
+      GENERATOR_USE_META_STORE: ${GENERATOR_USE_META_STORE:-false}
+      GENERATOR_META_DSN: ${GENERATOR_META_DSN:-}
+      GENERATOR_PROFILE: ${GENERATOR_PROFILE:-default}
       OLTP_DSN: postgresql://${PG_OLTP_USER}:${PG_OLTP_PASSWORD}@postgres_oltp:5432/${PG_OLTP_DB}
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      KAFKA_TOPIC_CLICKSTREAM: ${KAFKA_TOPIC_CLICKSTREAM}
-      KAFKA_TOPIC_ORDERS: ${KAFKA_TOPIC_ORDERS}
-      KAFKA_TOPIC_PAYMENTS: ${KAFKA_TOPIC_PAYMENTS}
-      KAFKA_TOPIC_SHIPMENTS: ${KAFKA_TOPIC_SHIPMENTS}
-      REDIS_URL: redis://redis:6379/0
-      REDIS_CHANNEL_ORDERS: ${REDIS_CHANNEL_ORDERS}
-      REDIS_CHANNEL_PAYMENTS: ${REDIS_CHANNEL_PAYMENTS}
-      REDIS_CHANNEL_CLICKSTREAM: ${REDIS_CHANNEL_CLICKSTREAM}
-      REDIS_STREAM_ORDERS: ${REDIS_STREAM_ORDERS}
-      MINIO_ENDPOINT: minio:9000
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
+      KAFKA_TOPIC_CLICKSTREAM: ${KAFKA_TOPIC_CLICKSTREAM:-}
+      KAFKA_TOPIC_ORDERS: ${KAFKA_TOPIC_ORDERS:-}
+      KAFKA_TOPIC_PAYMENTS: ${KAFKA_TOPIC_PAYMENTS:-}
+      KAFKA_TOPIC_SHIPMENTS: ${KAFKA_TOPIC_SHIPMENTS:-}
+      KAFKA_TOPIC_MARKETING_EMAIL: ${KAFKA_TOPIC_MARKETING_EMAIL:-}
+      KAFKA_TOPIC_SEO_ORGANIC: ${KAFKA_TOPIC_SEO_ORGANIC:-}
+      KAFKA_TOPIC_HR_TIME_TRACKING: ${KAFKA_TOPIC_HR_TIME_TRACKING:-}
+      KAFKA_TOPIC_FEATURE_FLAG_EVAL: ${KAFKA_TOPIC_FEATURE_FLAG_EVAL:-}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      REDIS_CHANNEL_ORDERS: ${REDIS_CHANNEL_ORDERS:-}
+      REDIS_CHANNEL_PAYMENTS: ${REDIS_CHANNEL_PAYMENTS:-}
+      REDIS_CHANNEL_CLICKSTREAM: ${REDIS_CHANNEL_CLICKSTREAM:-}
+      REDIS_STREAM_ORDERS: ${REDIS_STREAM_ORDERS:-}
+      REDIS_KEY_WEB_VITALS_PREFIX: ${REDIS_KEY_WEB_VITALS_PREFIX:-}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
-      MINIO_BUCKET_RAW: ${MINIO_BUCKET_RAW}
-      MINIO_PREFIX_PAYMENTS: ${MINIO_PREFIX_PAYMENTS}
-      MINIO_PREFIX_RETURNS: ${MINIO_PREFIX_RETURNS}
-      MINIO_PREFIX_CATALOG: ${MINIO_PREFIX_CATALOG}
-    volumes:
-      - ./generators:/app
+      MINIO_BUCKET_RAW: ${MINIO_BUCKET_RAW:-}
+      MINIO_PREFIX_PAYMENTS: ${MINIO_PREFIX_PAYMENTS:-}
+      MINIO_PREFIX_RETURNS: ${MINIO_PREFIX_RETURNS:-}
+      MINIO_PREFIX_CATALOG: ${MINIO_PREFIX_CATALOG:-}
+      MINIO_PREFIX_MARKETING_PERF: ${MINIO_PREFIX_MARKETING_PERF:-}
+      MINIO_PREFIX_SEO_RANKINGS: ${MINIO_PREFIX_SEO_RANKINGS:-}
+      MINIO_PREFIX_TELEMETRY_PERF: ${MINIO_PREFIX_TELEMETRY_PERF:-}
+      MINIO_PREFIX_TELEMETRY_ERRORS: ${MINIO_PREFIX_TELEMETRY_ERRORS:-}
+      MINIO_PREFIX_HR_PERF: ${MINIO_PREFIX_HR_PERF:-}
     working_dir: /app
     command: ["python", "-u", "generator.py"]
     depends_on:
@@ -604,6 +637,8 @@ services:
       - ./infra/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./infra/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
+      postgres_olap:
+        condition: service_healthy
       prometheus:
         condition: service_healthy
     healthcheck:
@@ -630,6 +665,8 @@ services:
       mlflow:
         condition: service_healthy
       grafana:
+        condition: service_healthy
+      superset:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1/ || exit 1"]

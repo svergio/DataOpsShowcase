@@ -65,6 +65,7 @@ flowchart TB
 
 ## См. также
 
+- [../SUPERSET.md](../SUPERSET.md) — дашборды по витринам `dwh_marts`
 - [oltp-er.md](oltp-er.md), [kafka-er.md](kafka-er.md), [minio-er.md](minio-er.md) — что приходит **до** dbt
 - [../ARCHITECTURE.md](../ARCHITECTURE.md) — монорепо
 - [../Generators.md](../Generators.md) — генераторы TechMart

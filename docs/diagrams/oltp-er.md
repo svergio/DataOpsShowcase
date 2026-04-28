@@ -2,7 +2,7 @@
 
 **Зачем:** быстро понять сущности маркетплейса TechMart в транзакционной БД.
 
-**Источник правды по DDL:** [services/postgres/init/02_oltp_schema.sql](../../services/postgres/init/02_oltp_schema.sql) (схема в контейнере `postgres_oltp`).
+**Источник правды по DDL:** [services/postgres/init/02_oltp_schema.sql](../../services/postgres/init/02_oltp_schema.sql) и расширение [02b_oltp_marketing_hr_finance.sql](../../services/postgres/init/02b_oltp_marketing_hr_finance.sql) (контейнер `postgres_oltp`).
 
 **Генератор:** вставки согласованы с [generators/generator.py](../../generators/generator.py) и [../Generators.md](../Generators.md).
 
@@ -54,7 +54,53 @@ erDiagram
         int quantity "> 0"
         numeric unit_price "(12,2)"
     }
+
+    MARKETING_CAMPAIGNS {
+        serial campaign_id PK
+        varchar campaign_name
+        varchar campaign_type
+        numeric budget
+        date start_date
+        date end_date
+        jsonb target_audience
+        varchar status
+    }
+
+    SEO_KEYWORDS {
+        serial keyword_id PK
+        varchar keyword "UNIQUE"
+        varchar keyword_category
+        int search_volume
+        int current_rank
+    }
+
+    EMPLOYEES {
+        serial employee_id PK
+        varchar department
+        varchar level
+        int manager_id FK "nullable self-ref"
+        date hire_date
+        varchar employment_status
+    }
+
+    FEATURE_FLAGS {
+        serial flag_id PK
+        varchar flag_key "UNIQUE"
+        int rollout_percentage
+        jsonb targeting_rules
+    }
+
+    GENERAL_LEDGER {
+        bigserial entry_id PK
+        date entry_date
+        varchar account_code
+        varchar account_type "ASSET/REVENUE..."
+        numeric debit_amount
+        numeric credit_amount
+    }
 ```
+
+Зависимости между блоками маркетплейса и новых таблиц в текущей схеме **не навязаны FK** на `orders`: кампании и финансовые строки связаны по смыслу с бизнесом (атрибуция может моделироваться в DWH после ingestion).
 
 ## Логические связи и cardinality
 

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MinIO performance parquet batches + Redis P95 aggregates (TTL 24h in code).
+-->
+<generator name="web_vitals">
+  <limits>
+    <emit_every_ticks>4</emit_every_ticks>
+    <records_per_emit>120</records_per_emit>
+    <redis_aggregate_every_ticks>3</redis_aggregate_every_ticks>
+  </limits>
+  <device_benchmarks>
+    <device name="DESKTOP">
+      <lcp min="1200" max="2500"/>
+      <fid min="50" max="100"/>
+      <cls min="0.05" max="0.15"/>
+      <ttfb min="200" max="600"/>
+    </device>
+    <device name="MOBILE">
+      <lcp min="2000" max="4000"/>
+      <fid min="100" max="300"/>
+      <cls min="0.10" max="0.25"/>
+      <ttfb min="400" max="1200"/>
+    </device>
+  </device_benchmarks>
+  <connection_multipliers>
+    <connection name="5G" mult="1.0"/>
+    <connection name="WiFi" mult="1.1"/>
+    <connection name="4G" mult="1.5"/>
+    <connection name="3G" mult="3.0"/>
+    <connection name="2G" mult="8.0"/>
+  </connection_multipliers>
+  <device_mix_weights>
+    <weight name="DESKTOP" value="0.55"/>
+    <weight name="MOBILE" value="0.45"/>
+  </device_mix_weights>
+  <perf_edge_cases>
+    <slow_lcp_pct>0.05</slow_lcp_pct>
+    <negative_fid_pct>0.02</negative_fid_pct>
+    <zero_metrics_pct>0.01</zero_metrics_pct>
+  </perf_edge_cases>
+  <page_urls_sample>
+    <item>/</item>
+    <item>/products</item>
+    <item>/cart</item>
+    <item>/checkout</item>
+  </page_urls_sample>
+</generator>
