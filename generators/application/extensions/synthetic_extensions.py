@@ -46,15 +46,15 @@ class SyntheticExtensions(
         oltp: OltpWriter,
         users: List[UserRef],
     ) -> None:
-        if oltp.get_table_count("marketing_campaigns") == 0:
+        if (oltp.get_table_count("marketing_campaigns") or 0) == 0:
             self._seed_campaigns(oltp)
-        if oltp.get_table_count("seo_keywords") == 0:
+        if (oltp.get_table_count("seo_keywords") or 0) == 0:
             self._seed_seo_keywords(oltp)
-        if oltp.get_table_count("feature_flags") == 0:
+        if (oltp.get_table_count("feature_flags") or 0) == 0:
             self._seed_feature_flags(oltp)
-        if oltp.get_table_count("employees") == 0:
+        if (oltp.get_table_count("employees") or 0) == 0:
             self._seed_employees(oltp)
-        if oltp.get_table_count("general_ledger") == 0:
+        if (oltp.get_table_count("general_ledger") or 0) == 0:
             self._seed_gl(oltp)
 
     def on_tick_extensions(

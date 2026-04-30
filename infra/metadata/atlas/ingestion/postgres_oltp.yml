@@ -1,0 +1,12 @@
+---
+# Catalog ingestion touchpoint — pair with scripts/postgres_reflect_to_yaml.py for table inventory.
+postgres:
+  logical_name: postgres_oltp
+  jdbc_ref: jdbc:postgresql://postgres_oltp:5432/techmart_oltp
+
+entities:
+  - typeName: Process
+    attributes:
+      name: postgres_techmart_oltp_metadata_scan
+      qualifiedName: jdbc://postgres_oltp/techmart_oltp#metadata-scan@dataops-net
+      description: INFORMATION_SCHEMA / publication wiring for OLTP CDC (Debezium slot dbz.publication).

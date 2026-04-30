@@ -1,0 +1,14 @@
+---
+entities:
+  - typeName: Process
+    relationshipAttributes:
+      inputs:
+        - typeName: kafka_topic
+          uniqueAttributes:
+            qualifiedName: "kafka://dataops@dataops_net/cdc_oltp.public.orders"
+    attributes:
+      name: cdc_structured_stream
+      qualifiedName: spark://dataops@cdc_structured_stream@cdc_structured_stream.py
+      description: |
+        Debezium JSON via subscribePattern(cdc_.*) с последующей записью в CDC/staging контуры OLAP.
+        Upstream aligns with debezium topic.prefix + table capture (see kafka_topics_batch.yml).

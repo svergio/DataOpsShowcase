@@ -1,0 +1,7 @@
+version: 1
+project: DataOpsShowcase
+description: >-
+  Links business domains, owners, and canonical terms used for Atlas classifications and DQ notes.
+profiles:
+  - name: canonical
+    path: domains.yml

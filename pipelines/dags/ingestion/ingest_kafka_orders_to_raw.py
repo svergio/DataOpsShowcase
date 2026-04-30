@@ -51,13 +51,12 @@ def ingest_kafka_orders_to_raw() -> None:
             source="kafka.orders",
             topic_key="orders",
             record_builder=order_record_builder,
-            target_columns=[],
             target_table="raw.kafka_orders",
             insert_columns=ORDER_INSERT_COLUMNS,
         )
 
     @task(outlets=[DS_RAW_KAFKA_ORDERS])
-    def publish(stats: dict, run_id: str = "{{ run_id }}") -> dict:
+    def publish(stats: dict, airflow_run_ref: str = "{{ run_id }}") -> dict:
         from services.common.logging_utils import get_logger
 
         get_logger(DAG_ID).info(
@@ -67,7 +66,7 @@ def ingest_kafka_orders_to_raw() -> None:
         notify_dbt_web(
             event=EVENT_INGESTION_COMPLETED,
             dag_id=DAG_ID,
-            run_id=run_id,
+            run_id=airflow_run_ref,
             target_layer="raw.kafka_orders",
         )
         return {"dag": DAG_ID, "status": "published", **stats}

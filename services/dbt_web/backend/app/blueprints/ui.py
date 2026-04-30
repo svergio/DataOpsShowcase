@@ -12,6 +12,10 @@ bp = Blueprint("ui", __name__)
 F = TypeVar("F", bound=Callable[..., Any])
 
 
+def _ui_prefix() -> str:
+    return settings.dbt_web_ui_url_prefix
+
+
 def _login_required(view: F) -> F:
     @wraps(view)
     def wrapped(*args: Any, **kwargs: Any) -> Any:
@@ -27,7 +31,7 @@ def _login_required(view: F) -> F:
 def login() -> Any:
     if session.get("dbt_ok") and request.method == "GET":
         nxt = request.args.get("next") or url_for("ui.runs")
-        if not str(nxt).startswith("/dbt-web"):
+        if not str(nxt).startswith(_ui_prefix()):
             nxt = url_for("ui.runs")
         return redirect(nxt)
     err = None
@@ -37,7 +41,7 @@ def login() -> Any:
         if u == settings.dbt_web_auth_user and p == settings.dbt_web_auth_password:
             session["dbt_ok"] = "1"
             nxt = request.form.get("next") or request.args.get("next") or url_for("ui.runs")
-            if not str(nxt).startswith("/dbt-web"):
+            if not str(nxt).startswith(_ui_prefix()):
                 nxt = url_for("ui.runs")
             return redirect(nxt)
         err = "Invalid username or password."

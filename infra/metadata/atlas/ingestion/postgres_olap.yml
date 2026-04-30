@@ -1,0 +1,11 @@
+---
+postgres:
+  logical_name: postgres_olap
+  jdbc_ref: jdbc:postgresql://postgres_olap:5432/techmart_dwh
+
+entities:
+  - typeName: Process
+    attributes:
+      name: postgres_techmart_dwh_metadata_scan
+      qualifiedName: jdbc://postgres_olap/techmart_dwh#metadata-scan@dataops-net
+      description: dbt models coexist with CDC sinks in separate schemas (see ARCHITECTURE_CDC.md).

@@ -1,8 +1,9 @@
-apache-airflow-providers-postgres==5.13.0
-apache-airflow-providers-amazon==8.27.0
-apache-airflow-providers-apache-spark==4.7.2
-confluent-kafka==2.5.0
-minio==7.2.7
-pyyaml==6.0.2
-requests==2.32.3
-psycopg2-binary==2.9.9
+apache-airflow-providers-apache-spark
+confluent-kafka
+minio
+pyyaml
+requests
+psycopg2-binary
+boto3
+mlflow
+prometheus-client

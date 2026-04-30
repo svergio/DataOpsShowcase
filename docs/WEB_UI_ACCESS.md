@@ -1,6 +1,6 @@
 # Доступ к веб-интерфейсам
 
-Проект открывает несколько веб-UI через **единый nginx ingress** (см. [API.md](API.md) и `infra/ingress/nginx.conf`).
+Проект использует **единый nginx ingress** — единственная HTTP-точка для всех веб-UI в стеке (файл [`infra/ingress/nginx.conf`](../infra/ingress/nginx.conf)). Прямые порты на хост для Airflow, Grafana, Superset, Prometheus, Jupyter, Spark UI, MinIO Console и т.д. **не публикуются**; исключение для инфраструктуры: **S3 API MinIO** по `MINIO_PORT` (часто `9000`) и порты БД/брокера (Postgres, Kafka, Redis).
 
 ## Базовый URL
 
@@ -8,92 +8,82 @@
 http://localhost:${INGRESS_PORT}
 ```
 
-Типичное значение: `INGRESS_PORT=8090` в `.env`. Все пути ниже **относительны** этой базы, если не указано иное.
+Типичное значение: `INGRESS_PORT=8090` в `.env` и `INGRESS_BASE_URL=http://localhost:8090`. Все пути ниже относительны этой базы.
 
-## Список интерфейсов
+**Терминология.** Ниже в таблице отдельно следует различать **полноценные веб-интерфейсы** (HTML в браузере) и **маршруты REST/API за тем же ingress** (ответы в основном JSON, без отдельного «веб-приложения» на уровне продукта). Пути `/schema-registry/` и `/kafka-connect/` относятся ко второму типу и доступны только при CDC-overlay.
+
+## Таблица маршрутов
+
+| Путь | Сервис |
+|------|--------|
+| `/` | Портал стека (Flask `portal_web`: ссылки и live-статусы контейнеров) |
+| `/dbt/` | dbt-web (Flask UI) |
+| `/dbt-web/…` | Постоянный редирект 301 на `/dbt/…` (совместимость закладок) |
+| `/api/`, `/dbt-api/` | тот же backend dbt-web |
+| `/airflow/` | Airflow Web UI |
+| `/mlflow/` | MLflow (уже `--static-prefix /mlflow`) |
+| `/grafana/` | Grafana |
+| `/superset/` | Apache Superset |
+| `/jupyter/` | Jupyter Notebook / Lab (`NotebookApp.base_url=/jupyter/`) |
+| `/prometheus/` | Prometheus UI (ингресс отрезает префикс до `prometheus:9090/`) |
+| `/pushgateway/` | Prometheus Pushgateway |
+| `/spark-master/` | Spark Master Web UI (`spark.master.ui.reverseProxy*` в `spark-defaults.conf`) |
+| `/spark-worker/` | Spark Worker Web UI |
+| `/minio-console/` | MinIO Console (**порт консоли 9001 только внутри сети**) |
+| `/atlas/` | Apache Atlas — веб-UI и API (после overlay `infra/metadata/atlas/docker-compose.atlas.yml`) |
+| `/schema-registry/` | Confluent Schema Registry — **только REST** (JSON; не отдельный UI), после overlay CDC |
+| `/kafka-connect/` | Kafka Connect / Debezium — **только REST** (JSON), после overlay CDC |
+
+Подключение объектного хранилища с хоста: `http://localhost:${MINIO_PORT}` (обычно `9000`) — без префикса ingress.
+
+**Согласование URL MinIO.** В [`docker-compose.yml`](../docker-compose.yml) по умолчанию: `MINIO_SERVER_URL=http://localhost:${MINIO_PORT}`, `MINIO_BROWSER_REDIRECT_URL=${INGRESS_BASE_URL}/minio-console/`. Если меняете `MINIO_PORT` или `INGRESS_PORT`/`INGRESS_BASE_URL`, скопируйте актуальные значения в `.env`, либо задайте `MINIO_BROWSER_REDIRECT_URL`/`MINIO_SERVER_URL` явно (см. [`.env.example`](../.env.example)).
+
+## Кратко по основным приложениям
 
 ### dbt-web (Flask)
 
 | Параметр | Значение |
 |----------|----------|
-| **URL** | `http://localhost:${INGRESS_PORT}/dbt-web/` |
-| **Назначение** | Просмотр runs, моделей, тестов, docs, **lineage** (D3), артефакты |
-| **Вход** | Сессия: `http://localhost:${INGRESS_PORT}/dbt-web/login` — логин/пароль по умолчанию из `DBT_WEB_AUTH_USER` / `DBT_WEB_AUTH_PASSWORD` (часто `admin` / `admin`) |
+| **URL** | `http://localhost:${INGRESS_PORT}/dbt/` |
+| **Логин** | `DBT_WEB_AUTH_USER` / `DBT_WEB_AUTH_PASSWORD` |
 
-**Важно:** отдельного контейнера «React-фронтенд» в compose **нет** — одно Flask-приложение (Jinja + статика).
+### Airflow / MLflow / Grafana
 
-### Airflow
+| Сервис | URL за ingress | Учётные данные |
+|--------|----------------|----------------|
+| **Airflow** | `${INGRESS_BASE_URL}/airflow/` | Из `.env`: `AIRFLOW_ADMIN_USER` / `AIRFLOW_ADMIN_PASSWORD` (в [`.env.example`](../.env.example) по умолчанию `admin` / `admin`) |
+| **MLflow** | `${INGRESS_BASE_URL}/mlflow/` | В типовом стенде UI **без входа**; URI трекинга внутри сети — `MLFLOW_TRACKING_URI` |
+| **Grafana** | `${INGRESS_BASE_URL}/grafana/` | `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` (в `.env.example`: `admin` / `admin`) |
 
-| Параметр | Значение |
-|----------|----------|
-| **URL** | `.../airflow/` |
-| **Назначение** | Мониторинг DAG, ручной запуск, логи задач |
-| **Учётка** | `AIRFLOW_ADMIN_USER` / `AIRFLOW_ADMIN_PASSWORD` из `.env` |
+Дашборды и метаданные прогонов: [OBSERVABILITY_AND_LOGGING.md](OBSERVABILITY_AND_LOGGING.md).
 
-### MLflow
+### API dbt-web
 
-| Параметр | Значение |
-|----------|----------|
-| **URL** | `.../mlflow/` |
-| **Назначение** | Эксперименты, метрики, артефакты моделей |
-| **Auth** | В учебном стенде обычно **без** обязательной аутентификации (см. `docker-compose`) |
+- Здоровье: `${INGRESS_BASE_URL}/dbt-api/v1/health`
+- Список API: [API.md](API.md)
 
-### Grafana
-
-| Параметр | Значение |
-|----------|----------|
-| **URL** | `.../grafana/` |
-| **Назначение** | Дашборды, метрики, лаги (по настройке) |
-| **Учётка** | `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` |
-
-### API dbt-web за ingress (тот же backend)
-
-- База для проверок: `http://localhost:${INGRESS_PORT}/dbt-api/v1/`
-- Пример: `.../dbt-api/v1/health`
-
-Список эндпоинтов: [API.md](API.md). Токен для **отдельного** dbt REST (сервис `dbt-rest`), если используется: `DBT_REST_TOKEN` в `.env`.
-
-## Где лежат учётки и порты
-
-| Файл / источник | Что внутри |
-|-----------------|------------|
-| `.env` | Рабочие значения для локали |
-| `.env.example` | Шаблон |
-| `docker-compose.yml` | Проброс `ENV` в контейнеры |
-| `infra/monitoring/grafana/provisioning/*` | Provisioning Grafana (учётка из env) |
-
-Сопоставление:
-
-- Airflow: `AIRFLOW_ADMIN_*`
-- Grafana: `GRAFANA_ADMIN_*`
-- dbt-web сессия: `DBT_WEB_AUTH_*` (и секрет `DBT_WEB_SECRET_KEY` в backend)
-
-## Быстрый старт в браузере
+## Быстрый старт
 
 ```text
-http://localhost:8090/dbt-web/
+http://localhost:8090/dbt/
 http://localhost:8090/airflow/
-http://localhost:8090/mlflow/
-http://localhost:8090/grafana/
-http://localhost:8090/dbt-api/v1/health
+http://localhost:8090/superset/
+http://localhost:8090/minio-console/
+http://localhost:8090/prometheus/
+http://localhost:8090/atlas/
 ```
 
-(замените `8090` на ваш `INGRESS_PORT`).
-
-## Прямой порт dbt-web (без nginx)
-
-- С хоста: `http://localhost:${DBT_WEB_BACKEND_PORT}` (часто `8010` → `http://localhost:8010/dbt-web/`)
+После включения overlays Atlas и CDC используйте те же базовые префиксы; пока контейнеры не подняты, запрос к `/atlas/`, `/schema-registry/` или `/kafka-connect/` вернёт 502 от nginx — это ожидаемо.
 
 ## Типовые неполадки
 
 | Симптом | Что проверить |
-|--------|----------------|
-| **404** | Запущен ли `ingress`, совпадает ли путь с `nginx.conf` (`docker compose ps`) |
-| **502** | Целевой сервис down или unhealthy; `docker compose ps`, логи |
-| **Cannot login** | Значения в `.env` для Airflow/Grafana/dbt-web; после смены — `docker compose up -d --force-recreate <сервис>` |
-| **401/403** на API | Токен `DBT_REST_TOKEN` (если требуется) для dbt REST, не путать с сессией dbt-web |
+|---------|----------------|
+| **404** | Совпадает ли путь с `nginx.conf` |
+| **502 на /atlas/ или CDC** | Поднят ли overlay с `atlas_server` / `schema_registry` / `debezium_connect` на `dataops_net` |
+| **Прямое подключение к старым портам** | Порты веб-сервисов закрыты; используйте `INGRESS_PORT` или `MINIO_PORT` только для S3 |
 
 ## См. также
 
 - [SETUP.md](SETUP.md) — первый запуск
-- [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) — зачем стенд
+- [ARCHITECTURE_ATLAS.md](ARCHITECTURE_ATLAS.md), [ARCHITECTURE_CDC.md](ARCHITECTURE_CDC.md) — Atlas и CDC за ingress

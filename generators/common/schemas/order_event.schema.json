@@ -49,6 +49,20 @@
         }
       }
     },
-    "metadata": {"type": "object"}
+    "metadata": {"type": "object"},
+    "commercial": {
+      "type": ["object", "null"],
+      "additionalProperties": true,
+      "properties": {
+        "subtotal_before_discount": {"type": "number"},
+        "discount_amount": {"type": "number"},
+        "coupon_code": {"type": ["string", "null"]},
+        "campaign_id": {"type": ["integer", "null"]},
+        "legacy_campaign_code": {"type": ["string", "null"]},
+        "legacy_order_ref": {"type": ["string", "null"]},
+        "order_lineage": {"type": "string"},
+        "crm_customer_key": {"type": ["string", "null"]}
+      }
+    }
   }
 }

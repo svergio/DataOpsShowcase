@@ -25,6 +25,8 @@
 | Наблюдаемость | **Prometheus**, **Grafana** | Метрики и дашборды |
 | Web UI | **dbt-web** (Flask) | Просмотр runs, моделей, тестов, lineage, ссылок на manifest |
 
+Публикация HTTP наружу идёт через **единый nginx ingress**: большинство ссылок в портале — полноценные веб-интерфейсы; префиксы **`/schema-registry/`** и **`/kafka-connect/`** — это **REST/API** (ответы JSON), и они живы только при CDC-overlay ([ARCHITECTURE_CDC.md](ARCHITECTURE_CDC.md)).
+
 Схемы: **схемы PostgreSQL (DWH)** — [diagrams/dwh-schemas.md](diagrams/dwh-schemas.md); **поток Data Vault** — [diagrams/data_vault_flow.md](diagrams/data_vault_flow.md).
 
 ## Как данные проходят через систему (упрощённо)
@@ -47,11 +49,11 @@
 
 - **Ingestion**: сравнение сырого слоя с генератором (Kafka, MinIO, OLTP).
 - **Пайплайн end-to-end**: прогон цепочки Airflow, проверка `meta.pipeline_*` и витрин.
-- **dbt**: `staging` → `vault` → `marts`, тесты и документация, UI **dbt-web** по префиксу `/dbt-web` (см. [WEB_UI_ACCESS.md](WEB_UI_ACCESS.md)).
+- **dbt**: `staging` → `vault` → `marts`, тесты и документация, UI **dbt-web** по префиксу `/dbt/` (см. [WEB_UI_ACCESS.md](WEB_UI_ACCESS.md)).
 - **Data Vault**: согласованность ссылок hub/link/sat, SCD2.
 - **ML**: обучение из DAG, чтение MLflow, сверка с `ml/training/`.
 - **Наблюдаемость**: логи, метрики, Grafana.
-- **Регресс API**: [API.md](API.md) — health, runs, lineage, webhooks (по настройке).
+- **Регресс API**: [API.md](API.md) — health, runs, lineage, webhooks (по настройке); CDC-префиксы ingress — REST, см. [WEB_UI_ACCESS.md](WEB_UI_ACCESS.md).
 
 ## Связанные документы
 

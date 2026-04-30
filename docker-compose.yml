@@ -3,16 +3,27 @@ services:
     image: postgres:${POSTGRES_IMAGE_TAG}
     container_name: postgres_oltp
     restart: unless-stopped
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - max_replication_slots=16
+      - -c
+      - max_wal_senders=10
     environment:
       POSTGRES_USER: ${PG_OLTP_USER}
       POSTGRES_PASSWORD: ${PG_OLTP_PASSWORD}
       POSTGRES_DB: ${PG_OLTP_DB}
+      DEBEZIUM_OLTP_PASSWORD: ${DEBEZIUM_OLTP_PASSWORD:-debezium_oltp_pass}
     ports:
       - "${PG_OLTP_PORT}:5432"
     volumes:
       - pg_oltp_data:/var/lib/postgresql/data
       - ./services/postgres/init/02_oltp_schema.sql:/docker-entrypoint-initdb.d/02_oltp_schema.sql:ro
       - ./services/postgres/init/02b_oltp_marketing_hr_finance.sql:/docker-entrypoint-initdb.d/02b_oltp_marketing_hr_finance.sql:ro
+      - ./services/postgres/init/02c_oltp_retail_legacy.sql:/docker-entrypoint-initdb.d/02c_oltp_retail_legacy.sql:ro
+      - ./services/postgres/cdc/oltp_debezium_bootstrap.sh:/docker-entrypoint-initdb.d/99_debezium_bootstrap.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${PG_OLTP_USER} -d ${PG_OLTP_DB}"]
       interval: 10s
@@ -25,10 +36,19 @@ services:
     image: postgres:${POSTGRES_IMAGE_TAG}
     container_name: postgres_olap
     restart: unless-stopped
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - max_replication_slots=16
+      - -c
+      - max_wal_senders=10
     environment:
       POSTGRES_USER: ${PG_OLAP_USER}
       POSTGRES_PASSWORD: ${PG_OLAP_PASSWORD}
       POSTGRES_DB: ${PG_OLAP_DB}
+      DEBEZIUM_OLAP_PASSWORD: ${DEBEZIUM_OLAP_PASSWORD:-debezium_olap_pass}
     ports:
       - "${PG_OLAP_PORT}:5432"
     volumes:
@@ -36,6 +56,8 @@ services:
       - ./services/postgres/init/03_dwh_schema.sql:/docker-entrypoint-initdb.d/03_dwh_schema.sql:ro
       - ./services/postgres/init/04_dwh_extensions.sql:/docker-entrypoint-initdb.d/04_dwh_extensions.sql:ro
       - ./services/postgres/init/05_meta_views.sql:/docker-entrypoint-initdb.d/05_meta_views.sql:ro
+      - ./services/postgres/init/06_dwh_raw_generators_extensions.sql:/docker-entrypoint-initdb.d/06_dwh_raw_generators_extensions.sql:ro
+      - ./services/postgres/cdc/olap_debezium_bootstrap.sh:/docker-entrypoint-initdb.d/99_debezium_bootstrap.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${PG_OLAP_USER} -d ${PG_OLAP_DB}"]
       interval: 10s
@@ -48,16 +70,28 @@ services:
     image: postgres:${POSTGRES_IMAGE_TAG}
     container_name: postgres_metadb
     restart: unless-stopped
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - max_replication_slots=16
+      - -c
+      - max_wal_senders=10
     environment:
       POSTGRES_USER: ${PG_META_USER}
       POSTGRES_PASSWORD: ${PG_META_PASSWORD}
       POSTGRES_DB: ${PG_META_DB}
+      DEBEZIUM_META_PASSWORD: ${DEBEZIUM_META_PASSWORD:-debezium_meta_pass}
+      PG_META_DB: ${PG_META_DB}
     ports:
       - "${PG_META_PORT}:5432"
     volumes:
       - pg_meta_data:/var/lib/postgresql/data
       - ./services/postgres/init/01_create_databases.sql:/docker-entrypoint-initdb.d/01_create_databases.sql:ro
       - ./services/postgres/init/06_generator_meta.sql:/docker-entrypoint-initdb.d/06_generator_meta.sql:ro
+      - ./services/postgres/init/07_dbt_rest.sql:/docker-entrypoint-initdb.d/07_dbt_rest.sql:ro
+      - ./services/postgres/cdc/metadb_debezium_bootstrap.sh:/docker-entrypoint-initdb.d/99_debezium_bootstrap.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${PG_META_USER} -d ${PG_META_DB}"]
       interval: 10s
@@ -120,9 +154,10 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_SERVER_URL: ${MINIO_SERVER_URL:-http://localhost:${MINIO_PORT:-9000}}
+      MINIO_BROWSER_REDIRECT_URL: ${MINIO_BROWSER_REDIRECT_URL:-${INGRESS_BASE_URL:-http://localhost:8090}/minio-console/}
     ports:
       - "${MINIO_PORT}:9000"
-      - "${MINIO_CONSOLE_PORT}:9001"
     volumes:
       - minio_data:/data
       - ./services/minio/config:/root/.minio
@@ -150,7 +185,6 @@ services:
       - "8080"
     ports:
       - "${SPARK_MASTER_PORT}:7077"
-      - "${SPARK_MASTER_UI_PORT}:8080"
     volumes:
       - spark_master_data:/opt/spark/work-dir
       - ./spark/jobs:/opt/spark/jobs
@@ -177,8 +211,6 @@ services:
       - "2"
       - --memory
       - 2G
-    ports:
-      - "${SPARK_WORKER_UI_PORT}:8081"
     volumes:
       - spark_worker_data:/opt/spark/work-dir
       - ./spark/jobs:/opt/spark/jobs
@@ -195,7 +227,12 @@ services:
       - dataops_net
 
   airflow_init:
-    image: apache/airflow:${AIRFLOW_IMAGE_TAG}
+    build:
+      context: .
+      dockerfile: services/airflow/Dockerfile
+      args:
+        AIRFLOW_IMAGE_TAG: ${AIRFLOW_IMAGE_TAG}
+    image: dataops/airflow:local
     container_name: airflow_init
     restart: "no"
     environment:
@@ -214,6 +251,10 @@ services:
         KAFKA_BOOTSTRAP_SERVERS: kafka:9092
         KAFKA_TOPIC_ORDERS: ${KAFKA_TOPIC_ORDERS}
         KAFKA_TOPIC_PAYMENTS: ${KAFKA_TOPIC_PAYMENTS}
+        KAFKA_TOPIC_MARKETING_EMAIL: ${KAFKA_TOPIC_MARKETING_EMAIL:-}
+        KAFKA_TOPIC_SEO_ORGANIC: ${KAFKA_TOPIC_SEO_ORGANIC:-}
+        KAFKA_TOPIC_HR_TIME_TRACKING: ${KAFKA_TOPIC_HR_TIME_TRACKING:-}
+        KAFKA_TOPIC_FEATURE_FLAG_EVAL: ${KAFKA_TOPIC_FEATURE_FLAG_EVAL:-}
         MINIO_ENDPOINT: minio:9000
         MINIO_ROOT_USER: ${MINIO_ROOT_USER}
         MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
@@ -221,6 +262,11 @@ services:
         MINIO_PREFIX_PAYMENTS: ${MINIO_PREFIX_PAYMENTS}
         MINIO_PREFIX_RETURNS: ${MINIO_PREFIX_RETURNS}
         MINIO_PREFIX_CATALOG: ${MINIO_PREFIX_CATALOG}
+        MINIO_PREFIX_MARKETING_PERF: ${MINIO_PREFIX_MARKETING_PERF:-}
+        MINIO_PREFIX_SEO_RANKINGS: ${MINIO_PREFIX_SEO_RANKINGS:-}
+        MINIO_PREFIX_TELEMETRY_PERF: ${MINIO_PREFIX_TELEMETRY_PERF:-}
+        MINIO_PREFIX_TELEMETRY_ERRORS: ${MINIO_PREFIX_TELEMETRY_ERRORS:-}
+        MINIO_PREFIX_HR_PERF: ${MINIO_PREFIX_HR_PERF:-}
         DBT_REST_BASE_URL: ${DBT_REST_BASE_URL:-http://dbt-rest:8580}
         DBT_REST_TOKEN: ${DBT_REST_TOKEN:-}
         DBT_WEB_BASE_URL: ${DBT_WEB_BASE_URL:-http://dbt-web-backend:8010}
@@ -235,7 +281,19 @@ services:
         MLFLOW_S3_ENDPOINT_URL: ${MLFLOW_S3_ENDPOINT_URL}
         AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
         AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
-        _PIP_ADDITIONAL_REQUIREMENTS: "apache-airflow-providers-apache-spark==4.7.2 confluent-kafka==2.5.0 minio==7.2.7 pyyaml==6.0.2 requests==2.32.3 mlflow==2.15.1 boto3==1.34.155 prometheus-client==0.21.0"
+        ATLAS_REST_URL: ${ATLAS_REST_URL:-http://atlas_server:21000/}
+        DEBEZIUM_CONNECT_HEALTH_URL: ${DEBEZIUM_CONNECT_HEALTH_URL:-http://debezium_connect:8083/}
+        PG_REFLECT_DSN: postgresql://${PG_OLTP_USER}:${PG_OLTP_PASSWORD}@postgres_oltp:5432/${PG_OLTP_DB}
+        ATLAS_QUALITY_MIN_TOTAL: ${ATLAS_QUALITY_MIN_TOTAL:-5}
+        GENERATOR_CONFIG_JSON: ${GENERATOR_CONFIG_JSON:-/opt/airflow/configs/generators/company.generator.json}
+        ATLAS_PUBLISH_RETRIES: ${ATLAS_PUBLISH_RETRIES:-3}
+        ATLAS_PUBLISH_RETRY_DELAY_SEC: ${ATLAS_PUBLISH_RETRY_DELAY_SEC:-5}
+        ATLAS_QUALITY_RETRIES: ${ATLAS_QUALITY_RETRIES:-2}
+        ATLAS_QUALITY_RETRY_DELAY_SEC: ${ATLAS_QUALITY_RETRY_DELAY_SEC:-15}
+        ATLAS_SKIP_STATIC_KAFKA: ${ATLAS_SKIP_STATIC_KAFKA:-}
+        PIP_DEFAULT_TIMEOUT: ${PIP_DEFAULT_TIMEOUT:-180}
+        PIP_RETRIES: ${PIP_RETRIES:-10}
+        PIP_DISABLE_PIP_VERSION_CHECK: "1"
       AIRFLOW_ADMIN_USER: ${AIRFLOW_ADMIN_USER}
       AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD}
     user: "${AIRFLOW_UID}:0"
@@ -256,6 +314,7 @@ services:
       - ./configs:/opt/airflow/configs
       - ./services/airflow/config:/opt/airflow/config
       - ./dbt:/workspace/dbt
+      - ./infra/metadata/atlas:/opt/airflow/infra/metadata/atlas
       - airflow_logs:/opt/airflow/logs
     depends_on:
       postgres_metadb:
@@ -264,7 +323,7 @@ services:
       - dataops_net
 
   airflow_scheduler:
-    image: apache/airflow:${AIRFLOW_IMAGE_TAG}
+    image: dataops/airflow:local
     container_name: airflow_scheduler
     restart: unless-stopped
     environment:
@@ -275,6 +334,8 @@ services:
     depends_on:
       airflow_init:
         condition: service_completed_successfully
+      dbt_rest:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --local"]
       interval: 30s
@@ -284,7 +345,7 @@ services:
       - dataops_net
 
   airflow_triggerer:
-    image: apache/airflow:${AIRFLOW_IMAGE_TAG}
+    image: dataops/airflow:local
     container_name: airflow_triggerer
     restart: unless-stopped
     environment:
@@ -295,6 +356,8 @@ services:
     depends_on:
       airflow_init:
         condition: service_completed_successfully
+      dbt_rest:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "airflow jobs check --job-type TriggererJob --local"]
       interval: 30s
@@ -304,19 +367,19 @@ services:
       - dataops_net
 
   airflow_webserver:
-    image: apache/airflow:${AIRFLOW_IMAGE_TAG}
+    image: dataops/airflow:local
     container_name: airflow_webserver
     restart: unless-stopped
     environment:
       <<: *airflow_env
     user: "${AIRFLOW_UID}:0"
     command: ["airflow", "webserver"]
-    ports:
-      - "${AIRFLOW_PORT}:8080"
     volumes: *airflow_volumes
     depends_on:
       airflow_init:
         condition: service_completed_successfully
+      dbt_rest:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/airflow/health')\""]
       interval: 30s
@@ -337,6 +400,36 @@ services:
     depends_on:
       postgres_olap:
         condition: service_healthy
+    networks:
+      - dataops_net
+
+  dbt_rest:
+    build:
+      context: ./services/dbt_rest
+      dockerfile: Dockerfile
+      args:
+        DBT_VERSION: ${DBT_IMAGE_TAG:-1.8.2}
+    image: dataops/dbt-rest:local
+    container_name: dbt-rest
+    restart: unless-stopped
+    environment:
+      DBT_PROJECT_DIR: /workspace/dbt
+      DBT_PROFILES_DIR: /workspace/dbt
+      DBT_REST_TOKEN: ${DBT_REST_TOKEN:-}
+      DBT_REST_DB_DSN: postgresql://${PG_META_USER}:${PG_META_PASSWORD}@postgres_metadb:5432/${PG_META_DB}
+    volumes:
+      - ./dbt:/workspace/dbt
+    depends_on:
+      postgres_olap:
+        condition: service_healthy
+      postgres_metadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8580/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - dataops_net
 
@@ -361,8 +454,6 @@ services:
       AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
       AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
       AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
-    ports:
-      - "${MLFLOW_PORT}:5000"
     depends_on:
       postgres_metadb:
         condition: service_healthy
@@ -386,6 +477,7 @@ services:
     environment:
       DBT_WEB_PORT: 8010
       DBT_WEB_SECRET_KEY: ${DBT_WEB_SECRET_KEY:-dev-dbt-web-secret}
+      DBT_WEB_UI_PATH: ${DBT_WEB_UI_PATH:-/dbt}
       DBT_WEB_AUTH_USER: ${DBT_WEB_AUTH_USER:-admin}
       DBT_WEB_AUTH_PASSWORD: ${DBT_WEB_AUTH_PASSWORD:-admin}
       DBT_REST_BASE_URL: ${DBT_REST_BASE_URL:-http://dbt-rest:8580}
@@ -396,12 +488,12 @@ services:
       DBT_WEB_STORAGE_SECURE: ${DBT_WEB_STORAGE_SECURE:-false}
       DBT_WEB_ARTIFACT_BUCKET: ${DBT_WEB_ARTIFACT_BUCKET:-dbt-artifacts}
       DBT_WEB_DB_DSN: ${DBT_WEB_DB_DSN:-postgresql://${PG_OLAP_USER}:${PG_OLAP_PASSWORD}@postgres_olap:5432/${PG_OLAP_DB}}
-    ports:
-      - "${DBT_WEB_BACKEND_PORT:-8010}:8010"
     depends_on:
       postgres_olap:
         condition: service_healthy
       minio:
+        condition: service_healthy
+      dbt_rest:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8010/api/v1/health')\""]
@@ -461,8 +553,6 @@ services:
       SUPERSET_DWH_DATABASE_URI: postgresql+psycopg2://${PG_OLAP_USER}:${PG_OLAP_PASSWORD}@postgres_olap:5432/${PG_OLAP_DB:-techmart_dwh}
       PYTHONPATH: /home/superset/.local/lib/python3.10/site-packages
     command: ["/bin/sh", "-c", "superset run -h 0.0.0.0 -p 8088"]
-    ports:
-      - "${SUPERSET_PORT}:8088"
     volumes:
       - ./configs/app/superset_config.py:/app/pythonpath/superset_config.py:ro
       - ./configs/app/superset_bootstrap.py:/app/pythonpath/superset_bootstrap.py:ro
@@ -487,15 +577,20 @@ services:
     environment:
       JUPYTER_TOKEN: ${JUPYTER_TOKEN}
       JUPYTER_ENABLE_LAB: "yes"
-    command: ["start-notebook.py", "--NotebookApp.token=${JUPYTER_TOKEN}", "--NotebookApp.allow_origin=*"]
-    ports:
-      - "${JUPYTER_PORT}:8888"
+    command:
+      [
+        "start-notebook.py",
+        "--NotebookApp.token=${JUPYTER_TOKEN}",
+        "--NotebookApp.base_url=/jupyter/",
+        "--ServerApp.base_url=/jupyter/",
+        "--NotebookApp.allow_origin=*",
+      ]
     volumes:
       - jupyterhub_data:/home/jovyan
       - ./notebooks:/home/jovyan/work
       - ./:/workspace
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8888')\""]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8888/jupyter/')\""]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -506,8 +601,6 @@ services:
     image: prom/pushgateway:${PUSHGATEWAY_IMAGE_TAG:-v1.9.0}
     container_name: pushgateway
     restart: unless-stopped
-    ports:
-      - "${PUSHGATEWAY_PORT:-9091}:9091"
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9091/-/healthy || exit 1"]
       interval: 30s
@@ -524,10 +617,9 @@ services:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
       - --web.enable-lifecycle
-    ports:
-      - "${PROMETHEUS_PORT}:9090"
     volumes:
       - ./infra/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/monitoring/prometheus-rules:/etc/prometheus/rules:ro
       - prometheus_data:/prometheus
     depends_on:
       pushgateway:
@@ -550,6 +642,8 @@ services:
     profiles: ["generators"]
     volumes:
       - ./configs/generators:/app/configs/generators:ro
+      - ./services/postgres/init/02b_oltp_marketing_hr_finance.sql:/app/sql/02b_oltp_marketing_hr_finance.sql:ro
+      - ./services/postgres/init/02c_oltp_retail_legacy.sql:/app/sql/02c_oltp_retail_legacy.sql:ro
     environment:
       GENERATOR_CONFIG_DIR: ${GENERATOR_CONFIG_DIR:-/app/configs/generators}
       GENERATOR_SETTINGS_FILE: ${GENERATOR_SETTINGS_FILE:-/app/configs/generators/company.generator.json}
@@ -574,6 +668,7 @@ services:
       GENERATOR_META_DSN: ${GENERATOR_META_DSN:-}
       GENERATOR_PROFILE: ${GENERATOR_PROFILE:-default}
       OLTP_DSN: postgresql://${PG_OLTP_USER}:${PG_OLTP_PASSWORD}@postgres_oltp:5432/${PG_OLTP_DB}
+      OLTP_EXTENSIONS_SQL: ${OLTP_EXTENSIONS_SQL:-/app/sql/02b_oltp_marketing_hr_finance.sql}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
       KAFKA_TOPIC_CLICKSTREAM: ${KAFKA_TOPIC_CLICKSTREAM:-}
       KAFKA_TOPIC_ORDERS: ${KAFKA_TOPIC_ORDERS:-}
@@ -630,8 +725,6 @@ services:
       GF_PATHS_PROVISIONING: /etc/grafana/provisioning
       GF_SERVER_ROOT_URL: ${INGRESS_BASE_URL:-http://localhost:8090}/grafana/
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
-    ports:
-      - "${GRAFANA_PORT}:3000"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./infra/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
@@ -649,15 +742,39 @@ services:
     networks:
       - dataops_net
 
+  portal_web:
+    build:
+      context: .
+      dockerfile: services/portal_web/Dockerfile
+    container_name: portal_web
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - dataops_net
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8050/health', timeout=3)\"",
+        ]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
   ingress:
     image: nginx:1.27-alpine
     container_name: dataops_ingress
     restart: unless-stopped
     ports:
+      - "80:80"
       - "${INGRESS_PORT:-8090}:80"
     volumes:
       - ./infra/ingress/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
+      portal_web:
+        condition: service_healthy
       airflow_webserver:
         condition: service_healthy
       dbt_web_backend:
@@ -667,6 +784,18 @@ services:
       grafana:
         condition: service_healthy
       superset:
+        condition: service_healthy
+      jupyterhub:
+        condition: service_healthy
+      prometheus:
+        condition: service_healthy
+      pushgateway:
+        condition: service_healthy
+      spark_master:
+        condition: service_healthy
+      spark_worker:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1/ || exit 1"]

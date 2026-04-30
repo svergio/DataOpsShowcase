@@ -1,0 +1,12 @@
+---
+# Metadb hosts logical DBs airflow, superset, mlflow — separate Debezium connectors per database.
+postgres:
+  logical_name: postgres_metadb
+  jdbc_ref: jdbc:postgresql://postgres_metadb:5432/metadb
+
+entities:
+  - typeName: Process
+    attributes:
+      name: postgres_metadb_metadata_scan
+      qualifiedName: jdbc://postgres_metadb/metadb#metadata-scan@dataops-net
+      description: Airflow/Superset/MLflow schemas; narrow table.include.list in connectors for POC.

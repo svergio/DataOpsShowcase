@@ -104,3 +104,4 @@ erDiagram
   и Kafka-топиком `${KAFKA_TOPIC_PAYMENTS}`.
 - `product_id` ссылается на `products.product_id` (OLTP).
 - Файлы caталога — снимки изменений по части `products`.
+- Экспорты **marketing / SEO / HR / telemetry** (см. таблицу расширенных префиксов) обычно содержат `campaign_id`, `keyword_id`, `employee_id` — те же бизнес-ключи, что в OLTP после [`02b`](../../services/postgres/init/02b_oltp_marketing_hr_finance.sql) / [`02c`](../../services/postgres/init/02c_oltp_retail_legacy.sql); при «легаси»-источнике часть полей может быть только строковой — тогда сверка в DWH идёт по правилам согласования, а не по строгому FK.

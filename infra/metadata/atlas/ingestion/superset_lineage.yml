@@ -1,0 +1,9 @@
+---
+entities:
+  - typeName: Process
+    attributes:
+      name: superset_app_metadata
+      qualifiedName: business://superset/superset@postgres_metadb
+      description: |
+        Dashboards/datasets in Superset; lineage to OLAP/dbt usually via physical DB tables.
+        Correlate with jdbc://postgres_olap lineage and dbt models emitted from manifest.

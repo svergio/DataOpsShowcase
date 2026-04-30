@@ -28,6 +28,99 @@ oltp:
       pk: [order_item_id]
       watermark_column: null
       columns: [order_item_id, order_id, product_id, quantity, unit_price]
+    - source_table: marketing_campaigns
+      target_table: raw.oltp_marketing_campaigns
+      pk: [campaign_id]
+      watermark_column: updated_at
+      columns:
+        - campaign_id
+        - campaign_name
+        - campaign_type
+        - channel
+        - budget
+        - currency
+        - start_date
+        - end_date
+        - target_audience
+        - status
+        - created_by
+        - created_at
+        - updated_at
+    - source_table: seo_keywords
+      target_table: raw.oltp_seo_keywords
+      pk: [keyword_id]
+      watermark_column: updated_at
+      columns:
+        - keyword_id
+        - keyword
+        - keyword_category
+        - target_url
+        - search_volume
+        - competition_score
+        - cpc_estimate
+        - currency
+        - current_rank
+        - target_rank
+        - is_tracked
+        - created_at
+        - updated_at
+    - source_table: feature_flags
+      target_table: raw.oltp_feature_flags
+      pk: [flag_id]
+      watermark_column: updated_at
+      columns:
+        - flag_id
+        - flag_key
+        - flag_name
+        - description
+        - is_enabled
+        - rollout_percentage
+        - targeting_rules
+        - created_at
+        - updated_at
+    - source_table: employees
+      target_table: raw.oltp_employees
+      pk: [employee_id]
+      watermark_column: updated_at
+      columns:
+        - employee_id
+        - employee_number
+        - first_name
+        - last_name
+        - email
+        - department
+        - job_title
+        - level
+        - manager_id
+        - hire_date
+        - termination_date
+        - employment_status
+        - location
+        - remote_status
+        - salary
+        - currency
+        - created_at
+        - updated_at
+    - source_table: general_ledger
+      target_table: raw.oltp_general_ledger
+      pk: [entry_id]
+      watermark_column: created_at
+      columns:
+        - entry_id
+        - entry_date
+        - entry_number
+        - account_code
+        - account_name
+        - account_type
+        - debit_amount
+        - credit_amount
+        - currency
+        - transaction_type
+        - reference_id
+        - reference_type
+        - description
+        - posted_by
+        - created_at
 
 kafka:
   bootstrap_servers_env: KAFKA_BOOTSTRAP_SERVERS
@@ -65,6 +158,22 @@ kafka:
         - decline_reason
         - event_ts
       payload_field: payload
+    marketing_email:
+      topic_env: KAFKA_TOPIC_MARKETING_EMAIL
+      target_table: raw.kafka_extension_events
+      domain_code: marketing_email
+    seo_organic:
+      topic_env: KAFKA_TOPIC_SEO_ORGANIC
+      target_table: raw.kafka_extension_events
+      domain_code: seo_organic
+    hr_time_tracking:
+      topic_env: KAFKA_TOPIC_HR_TIME_TRACKING
+      target_table: raw.kafka_extension_events
+      domain_code: hr_time_tracking
+    feature_flag_eval:
+      topic_env: KAFKA_TOPIC_FEATURE_FLAG_EVAL
+      target_table: raw.kafka_extension_events
+      domain_code: feature_flag_eval
 
 minio:
   endpoint_env: MINIO_ENDPOINT
@@ -81,5 +190,20 @@ minio:
     - prefix_env: MINIO_PREFIX_CATALOG
       target_table: raw.minio_files_landing
       file_format: csv
+    - prefix_env: MINIO_PREFIX_MARKETING_PERF
+      target_table: raw.minio_files_landing
+      file_format: jsonl
+    - prefix_env: MINIO_PREFIX_SEO_RANKINGS
+      target_table: raw.minio_files_landing
+      file_format: jsonl
+    - prefix_env: MINIO_PREFIX_TELEMETRY_PERF
+      target_table: raw.minio_files_landing
+      file_format: jsonl
+    - prefix_env: MINIO_PREFIX_TELEMETRY_ERRORS
+      target_table: raw.minio_files_landing
+      file_format: jsonl
+    - prefix_env: MINIO_PREFIX_HR_PERF
+      target_table: raw.minio_files_landing
+      file_format: jsonl
   state_table: raw.minio_files_landing
   max_files_per_run: 200

@@ -46,7 +46,6 @@ def consume_topic(
     source: str,
     topic_key: str,
     record_builder,
-    target_columns: list[str],
     target_table: str,
     insert_columns: list[str],
 ) -> dict[str, Any]:
@@ -80,7 +79,12 @@ def consume_topic(
             if not batch.messages:
                 finish_run(run_meta, status="success", rows_in=0, rows_out=0)
                 return {"topic": topic, "messages": 0, "offsets": offsets}
-            rows = [record_builder(msg) for msg in batch.messages]
+            msg_count = len(batch.messages)
+            rows = []
+            for msg in batch.messages:
+                built = record_builder(msg)
+                if built is not None:
+                    rows.append(built)
             inserted = bulk_insert(
                 "postgres_dwh",
                 target_table,
@@ -114,13 +118,17 @@ def consume_topic(
         finish_run(
             run_meta,
             status="success",
-            rows_in=len(batch),
+            rows_in=msg_count,
             rows_out=inserted,
-            payload={"offsets": new_offsets},
+            payload={
+                "offsets": new_offsets,
+                "kafka_messages_in_batch": msg_count,
+                "rows_after_filter": len(rows),
+            },
         )
         return {
             "topic": topic,
-            "messages": len(batch),
+            "messages": msg_count,
             "offsets": new_offsets,
             "rows_inserted": inserted,
         }
@@ -165,6 +173,61 @@ def payment_record_builder(msg) -> tuple:
         payload.get("payment_method"),
         payload.get("status"),
         payload.get("decline_reason"),
+        json.dumps(payload, default=str, ensure_ascii=False),
+        event_ts,
+    )
+
+
+def extension_record_builder(msg, *, domain_code: str) -> tuple | None:
+    raw = getattr(msg, "value", None)
+    if isinstance(raw, dict):
+        payload = raw
+    elif isinstance(raw, (bytes, bytearray)):
+        try:
+            payload = json.loads(raw.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            payload = {}
+    elif isinstance(raw, str):
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            payload = {}
+    else:
+        payload = {}
+    evt = (
+        payload.get("event_timestamp")
+        or payload.get("event_ts")
+        or payload.get("timestamp")
+        or payload.get("ts")
+    )
+    event_ts = _to_ts(evt)
+    if event_ts is None and isinstance(evt, (int, float)):
+        ts_f = float(evt)
+        event_ts = _to_ts(ts_f / 1000.0) if ts_f > 1e12 else _to_ts(ts_f)
+    if event_ts is None and getattr(msg, "timestamp_ms", None):
+        event_ts = _to_ts(float(msg.timestamp_ms) / 1000.0)
+    part = getattr(msg, "partition", None)
+    off = getattr(msg, "offset", None)
+    if part is None or off is None:
+        logger.warning(
+            "skipping extension message without partition/offset",
+            extra={
+                "extra_payload": {
+                    "domain_code": domain_code,
+                    "topic": getattr(msg, "topic", None),
+                }
+            },
+        )
+        return None
+    eid = payload.get("event_id")
+    top = getattr(msg, "topic", None) or ""
+    return (
+        top,
+        int(part),
+        int(off),
+        domain_code,
+        str(eid) if eid is not None else None,
+        payload.get("event_type"),
         json.dumps(payload, default=str, ensure_ascii=False),
         event_ts,
     )

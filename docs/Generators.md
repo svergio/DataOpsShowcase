@@ -2,7 +2,7 @@
 
 **Bounded context генератора** отвечает только за **эмиссию синтетических данных** в **четыре назначения**: PostgreSQL **OLTP**, **Kafka**, **Redis**, **MinIO**. Внутренние преобразования при генерации (агрегации, распределения, сборка payload) входят в этот контур.
 
-**Вне контура** остаётся ETL/ELT: Airflow, Spark, dbt и загрузка в DWH/OLAP (`postgres_olap`). Генератор **не** пишет в OLAP и не управляет dbt; витрины описаны в [diagrams/dwh-schemas.md](diagrams/dwh-schemas.md), [diagrams/data_vault_flow.md](diagrams/data_vault_flow.md), [PIPELINES.md](PIPELINES.md).
+**Вне контура** остаётся ETL/ELT: Airflow, Spark, dbt и загрузка в DWH/OLAP (`postgres_olap`). Генератор **не** пишет в OLAP и не управляет dbt; витрины и канон DV: [diagrams/dwh-schemas.md](diagrams/dwh-schemas.md), [diagrams/data_vault_flow.md](diagrams/data_vault_flow.md), [PIPELINES.md](PIPELINES.md), [DV2_ENTITY_KEYS.md](DV2_ENTITY_KEYS.md).
 
 ## Схема потоков
 

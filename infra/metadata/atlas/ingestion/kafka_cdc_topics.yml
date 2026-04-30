@@ -1,0 +1,32 @@
+---
+entities:
+  - typeName: kafka_topic
+    attributes:
+      name: kafka_events_orders
+      topic: techmart.events.orders
+      qualifiedName: "kafka://dataops@dataops_net/techmart.events.orders"
+      uri: "kafka://kafka:9092/techmart.events.orders"
+  - typeName: kafka_topic
+    attributes:
+      name: kafka_payments_transactions
+      topic: techmart.payments.transactions
+      qualifiedName: "kafka://dataops@dataops_net/techmart.payments.transactions"
+      uri: "kafka://kafka:9092/techmart.payments.transactions"
+  - typeName: kafka_topic
+    attributes:
+      name: kafka_shipments_tracking
+      topic: techmart.shipments.tracking
+      qualifiedName: "kafka://dataops@dataops_net/techmart.shipments.tracking"
+      uri: "kafka://kafka:9092/techmart.shipments.tracking"
+  - typeName: kafka_topic
+    attributes:
+      name: kafka_clickstream
+      topic: techmart.events.clickstream
+      qualifiedName: "kafka://dataops@dataops_net/techmart.events.clickstream"
+      uri: "kafka://kafka:9092/techmart.events.clickstream"
+  - typeName: kafka_topic
+    attributes:
+      name: cdc_meta_airflow_topic
+      topic: cdc_meta_airflow
+      qualifiedName: "kafka://dataops@dataops_net/cdc_meta_airflow"
+      uri: "kafka://kafka:9092/cdc_meta_airflow"

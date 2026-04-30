@@ -63,6 +63,10 @@ flowchart TB
 | Marts | `dwh_marts` | Витрины для BI и downstream |
 | Serving | `dwh_serving` | Узкие таблицы «под продукт»/экспорт |
 
+## Ключи расширений (Generators / OLTP)
+
+- [../DV2_ENTITY_KEYS.md](../DV2_ENTITY_KEYS.md) — канон бизнес-ключей для маркетинга, SEO, HR, GL и Kafka extension-событий.
+
 ## См. также
 
 - [../SUPERSET.md](../SUPERSET.md) — дашборды по витринам `dwh_marts`

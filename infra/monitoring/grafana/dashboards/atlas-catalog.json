@@ -1,0 +1,77 @@
+{
+  "annotations": {"list": []},
+  "description": "Atlas catalog counts and quality gates (Pushgateway metrics from atlas_quality_gates.py).",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Atlas gate OK (latest)",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "gridPos": {"h": 4, "w": 8, "x": 0, "y": 0},
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "horizontal"
+      },
+      "fieldConfig": {"defaults": {"decimals": 0}, "overrides": []},
+      "targets": [
+        {
+          "expr": "dataops_atlas_gate_ok{job=\"atlas_quality\"}",
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "Prometheus"}
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Coarse Atlas entity totals (summed counts)",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "gridPos": {"h": 10, "w": 16, "x": 8, "y": 0},
+      "targets": [
+        {
+          "expr": "dataops_atlas_coarse_total{job=\"atlas_quality\"}",
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "Prometheus"}
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "table",
+      "title": "Entity counts by type (last scrape)",
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 10},
+      "targets": [
+        {
+          "expr": "dataops_atlas_entity_count{type=~\".+\",job=\"atlas_quality\"}",
+          "refId": "A",
+          "format": "table",
+          "instant": true,
+          "datasource": {"type": "prometheus", "uid": "Prometheus"}
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["atlas", "metadata"],
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Atlas catalog quality",
+  "uid": "atlas-catalog",
+  "version": 1,
+  "weekStart": ""
+}

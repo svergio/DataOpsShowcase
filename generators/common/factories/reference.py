@@ -1,6 +1,6 @@
 import random
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Optional
 
 from faker import Faker
 
@@ -68,6 +68,7 @@ class UserRef:
     full_name: str
     country: str
     currency: str
+    legacy_crm_customer_id: Optional[str] = None
 
 
 @dataclass

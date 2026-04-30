@@ -1,0 +1,25 @@
+---
+# Logical MinIO prefixes for raw lake layout (MINIO_BUCKET_RAW + prefixes from .env).
+entities:
+  - typeName: Process
+    attributes:
+      name: minio_bucket_raw_root
+      qualifiedName: "s3://minio/techmart-data#@dataops_net"
+      description: RAW bucket landing zone backed by MINIO_BUCKET_RAW defaults (review against live MinIO policy).
+  - typeName: Process
+    attributes:
+      name: minio_raw_payments_prefix
+      qualifiedName: "s3://minio/techmart-data#raw/payments@dataops_net"
+      description: Synthetic payments parquet/jsonl payloads before warehouse staging.
+  - typeName: Process
+    attributes:
+      name: minio_raw_returns_prefix
+      qualifiedName: "s3://minio/techmart-data#raw/returns@dataops_net"
+      description: Returns CSV / structured drops into MinIO RAW.
+  - typeName: Process
+    attributes:
+      name: minio_raw_product_catalog_prefix
+      qualifiedName: "s3://minio/techmart-data#raw/product_catalog@dataops_net"
+      description: Product catalog CSV snapshots under deterministic prefixes.
+notes:
+  - "Prefer native S3/MinIO Atlas typedefs once imported; Processes keep deterministic qualifiedNames."

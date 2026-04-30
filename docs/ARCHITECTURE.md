@@ -27,8 +27,8 @@
 - `docker compose` поднимает, среди прочего: PostgreSQL (роли OLTP/OLAP/meta), Kafka, MinIO, Spark, Airflow, MLflow, **dbt-web**, Prometheus, **ingress (nginx)**.
 - В **Airflow** смонтированы `pipelines/`, `services/`, `spark/`, `ml/`, `generators/`, `configs/`, `dbt/`.
 - **Spark** workers получают `spark/jobs` и `spark/conf`; `py_files` — общий runtime из `spark/common/`.
-- **dbt-web** обслуживает UI по префиксу `/dbt-web` и API `/api/v1` за ingress (см. [WEB_UI_ACCESS.md](WEB_UI_ACCESS.md), [API.md](API.md)).
-- **Наблюдаемость**: JSON-логи, метрики Prometheus, дашборды Grafana (см. `infra/monitoring`).
+- **dbt-web** обслуживает UI по префиксу `/dbt` и API `/api/v1` за ingress (см. [WEB_UI_ACCESS.md](WEB_UI_ACCESS.md), [API.md](API.md)).
+- **Наблюдаемость**: JSON-логи, метрики Prometheus, дашборды Grafana — конфиги в [`infra/monitoring/`](../infra/monitoring/); см. также [OBSERVABILITY_AND_LOGGING.md](OBSERVABILITY_AND_LOGGING.md) и [TESTING_AND_DATA_QUALITY.md](TESTING_AND_DATA_QUALITY.md) (отличие от dbt DQ).
 
 ## Поток данных (логически)
 
@@ -49,3 +49,5 @@ OLTP, Kafka, MinIO
 
 - [SETUP.md](SETUP.md) — запуск
 - [Generators.md](Generators.md) — источники данных
+- [ARCHITECTURE_ATLAS.md](ARCHITECTURE_ATLAS.md) — Atlas (каталог), прямые порты vs ingress
+- [ARCHITECTURE_CDC.md](ARCHITECTURE_CDC.md) — Debezium, Schema Registry, Spark CDC

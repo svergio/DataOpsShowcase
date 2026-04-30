@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     service_name: str = "dbt-web"
     service_version: str = "0.1.0"
     dbt_web_port: int = Field(default=8010, alias="DBT_WEB_PORT")
+    dbt_web_ui_path: str = Field(default="/dbt", alias="DBT_WEB_UI_PATH")
 
     dbt_rest_base_url: str = Field(default="http://dbt-rest:8580", alias="DBT_REST_BASE_URL")
     dbt_rest_token: str = Field(default="", alias="DBT_REST_TOKEN")
@@ -32,6 +33,14 @@ class Settings(BaseSettings):
     )
     dbt_web_auth_user: str = Field(default="admin", alias="DBT_WEB_AUTH_USER")
     dbt_web_auth_password: str = Field(default="admin", alias="DBT_WEB_AUTH_PASSWORD")
+
+    @property
+    def dbt_web_ui_url_prefix(self) -> str:
+        p = (self.dbt_web_ui_path or "").strip()
+        if not p.startswith("/"):
+            p = "/" + p
+        p = p.rstrip("/")
+        return p if p else "/dbt"
 
 
 settings = Settings()

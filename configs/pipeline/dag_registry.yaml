@@ -10,6 +10,7 @@ datasets:
   raw_kafka_orders: "postgres://postgres_dwh/raw/kafka_orders"
   raw_kafka_payments: "postgres://postgres_dwh/raw/kafka_payments"
   raw_minio_files: "postgres://postgres_dwh/raw/minio_files"
+  raw_kafka_extensions: "postgres://postgres_dwh/raw/kafka_extensions"
   stg_clean: "postgres://postgres_dwh/staging/clean"
   vault_loaded: "postgres://postgres_dwh/vault/loaded"
   vault_scd2_done: "postgres://postgres_dwh/vault/scd2"
@@ -45,16 +46,27 @@ dags:
     source: minio
     produces: [raw_minio_files]
 
+  - id: dag_ingest_kafka_extensions_to_raw
+    schedule: "*/5 * * * *"
+    layer: ingestion
+    source: kafka.extensions
+    produces: [raw_kafka_extensions]
+
   - id: dag_spark_preprocess_to_stg
     schedule: null
     layer: preprocessing
-    consumes: [raw_oltp, raw_kafka_orders, raw_kafka_payments, raw_minio_files]
+    consumes:
+      - raw_oltp
+      - raw_kafka_orders
+      - raw_kafka_payments
+      - raw_minio_files
     produces: [stg_clean]
 
   - id: dag_load_datavault
     schedule: null
     layer: vault
-    consumes: [stg_clean]
+    consumes:
+      - stg_clean
     produces: [vault_loaded]
 
   - id: dag_scd2_satellites
@@ -72,7 +84,9 @@ dags:
   - id: dag_dbt_vault_rest
     schedule: null
     layer: dbt
-    consumes: [dbt_staging_done]
+    consumes:
+      - dbt_staging_done
+      - raw_kafka_extensions
     produces: [dbt_vault_done]
 
   - id: dag_dbt_marts_rest

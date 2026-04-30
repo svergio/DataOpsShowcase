@@ -1,0 +1,23 @@
+{
+  "name": "postgres-metadb-airflow",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "tasks.max": "1",
+    "database.hostname": "postgres_metadb",
+    "database.port": "5432",
+    "database.user": "debezium_meta",
+    "database.password": "debezium_meta_pass",
+    "database.dbname": "airflow",
+    "topic.prefix": "cdc_meta_airflow",
+    "slot.name": "debezium_metadb_airflow_slot",
+    "publication.name": "dbz_pub_airflow",
+    "plugin.name": "pgoutput",
+    "schema.include.list": "public",
+    "table.include.list": "public.*",
+    "heartbeat.interval.ms": "10000",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter.schemas.enable": "false"
+  }
+}

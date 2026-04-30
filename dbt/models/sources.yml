@@ -171,6 +171,64 @@ sources:
               - not_null:
                   severity: error
           - name: payload
+      - name: oltp_marketing_campaigns
+        loaded_at_field: ingested_at
+        columns:
+          - name: campaign_id
+          - name: ingested_at
+            tests:
+              - not_null:
+                  severity: error
+      - name: oltp_seo_keywords
+        loaded_at_field: ingested_at
+        columns:
+          - name: keyword_id
+          - name: ingested_at
+            tests:
+              - not_null:
+                  severity: error
+      - name: oltp_feature_flags
+        loaded_at_field: ingested_at
+        columns:
+          - name: flag_id
+          - name: ingested_at
+            tests:
+              - not_null:
+                  severity: error
+      - name: oltp_employees
+        loaded_at_field: ingested_at
+        columns:
+          - name: employee_id
+          - name: ingested_at
+            tests:
+              - not_null:
+                  severity: error
+      - name: oltp_general_ledger
+        loaded_at_field: ingested_at
+        columns:
+          - name: entry_id
+          - name: ingested_at
+            tests:
+              - not_null:
+                  severity: error
+      - name: kafka_extension_events
+        loaded_at_field: ingested_at
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns:
+                - topic
+                - partition_id
+                - kafka_offset
+        columns:
+          - name: topic
+          - name: partition_id
+          - name: kafka_offset
+          - name: domain_code
+          - name: payload
+          - name: ingested_at
+            tests:
+              - not_null:
+                  severity: error
 
   - name: staging_pipeline
     database: "{{ env_var('DBT_DBNAME', 'techmart_dwh') }}"

@@ -1,0 +1,5 @@
+---
+# Preferred path: regenerate from dbt/target/manifest.json with:
+#   python infra/metadata/atlas/scripts/dbt_manifest_to_atlas_yaml.py --manifest dbt/target/manifest.json --output /tmp/dbt_atlas.yml
+#   python infra/metadata/atlas/scripts/entity_publish.py --atlas-base-url http://atlas_server:21000 /tmp/dbt_atlas.yml
+manifest_path: ../../../dbt/target/manifest.json

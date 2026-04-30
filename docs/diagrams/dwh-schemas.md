@@ -1,8 +1,12 @@
 # Аналитическое хранилище (DWH): схемы PostgreSQL
 
-**Назначение:** показать, **в каких схемах** лежат слои витрины и метаданных в текущем репозитории. Согласовано с [dbt/dbt_project.yml](../../dbt/dbt_project.yml) и init SQL: [services/postgres/init/04_dwh_extensions.sql](../../services/postgres/init/04_dwh_extensions.sql), [dbt/macros/utils/ensure_dwh_schemas.sql](../../dbt/macros/utils/ensure_dwh_schemas.sql).
+**Назначение:** показать, **в каких схемах** лежат слои витрины и метаданных в текущем репозитории. Согласовано с [dbt/dbt_project.yml](../../dbt/dbt_project.yml) и init SQL: [04_dwh_extensions.sql](../../services/postgres/init/04_dwh_extensions.sql), [06_dwh_raw_generators_extensions.sql](../../services/postgres/init/06_dwh_raw_generators_extensions.sql), [dbt/macros/utils/ensure_dwh_schemas.sql](../../dbt/macros/utils/ensure_dwh_schemas.sql).
 
-**Важно:** OLTP (операционные заказы) — **отдельная** база/контейнер (`postgres_oltp`, схема с транзакциями). Ниже — **аналитический** Postgres, куда dbt пишет модели и куда Airflow/Spark пишут raw/staging по пайплайнам (подробнее — [../PIPELINES.md](../PIPELINES.md)).
+**Слой raw (OLAP):** помимо базовых `raw.oltp_*` / `raw.kafka_*`, расширения генератора (маркетинг, SEO, HR, GL, Kafka extension-топики) лежат в таблицах из `06_dwh_raw_generators_extensions.sql`. Канон бизнес-ключей для dbt-моделей: [../DV2_ENTITY_KEYS.md](../DV2_ENTITY_KEYS.md).
+
+**Волна BDV (pit/bridge)** для новых хабов при необходимости выносится отдельно — см. [data_vault_flow.md](data_vault_flow.md).
+
+**Важно:** OLTP (операционные заказы) — **отдельная** база/контейнер (`postgres_oltp`, схема с транзакциями). Ниже — **аналитический** Postgres (`postgres_olap`), куда dbt пишет модели и куда Airflow/Spark пишут raw/staging по пайплайнам (подробнее — [../PIPELINES.md](../PIPELINES.md)).
 
 ## Схемы dbt (слои)
 

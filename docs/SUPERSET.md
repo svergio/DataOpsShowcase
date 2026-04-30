@@ -26,13 +26,12 @@ docker compose up -d postgres_metadb postgres_olap superset_init superset
 
 | Способ | URL |
 |--------|-----|
-| Прямой порт из `.env` | `http://localhost:${SUPERSET_PORT:-8088}/` |
-| Через ingress | `http://localhost:${INGRESS_PORT:-8090}/superset/` |
+| Рекомендуется (единый вход) | `http://localhost:${INGRESS_PORT:-8090}/superset/` |
 
-Логин: см. `.env` — `SUPERSET_ADMIN_USER` / `SUPERSET_ADMIN_PASSWORD`.
+Отдельного проброса `SUPERSET_PORT` на хост для UI нет. Логин: `SUPERSET_ADMIN_USER` / `SUPERSET_ADMIN_PASSWORD`.
 
 ## Примечания
 
 - Первое развёртывание должно пробежать пайплайны и **dbt** по слою marts; иначе bootstrap пропускает недоступные таблицы.
 - Метаданные на PostgreSQL заменили SQLite для стека; том `superset_home` сохранён для локальных файлов Superset при необходимости.
-- Если субпуть через ingress показывает неверные ссылки, можно пользоваться доступом только по порту `SUPERSET_PORT` или добавить переменную `SUPERSET_WEBSERVER_BASE_URL` в окружение (см. документацию Superset под ваш версию образа).
+- При неверных ссылках во встроенном UI задайте корректный `SUPERSET_WEBSERVER_BASE_URL`/`APPLICATION_ROOT` под ваш образ Superset.

@@ -16,7 +16,7 @@ DAG_ID = "dag_ingest_oltp_to_stg"
 LAYER = "ingestion"
 SOURCE = "oltp"
 SCHEDULE = "*/15 * * * *"
-DEFAULT_RUN_ID = "{{ run_id }}"
+DEFAULT_AIRFLOW_RUN_REF = "{{ run_id }}"
 
 
 def _parse_cursor(raw: str | None, fallback_ts: str) -> tuple[str, Any]:
@@ -76,7 +76,7 @@ def ingest_oltp_to_stg() -> None:
     @task_group(group_id="extract")
     def extract_group(specs: list[dict[str, Any]]) -> None:
         @task(retries=3)
-        def extract_table(spec: dict[str, Any], run_id: str = DEFAULT_RUN_ID) -> dict[str, Any]:
+        def extract_table(spec: dict[str, Any], airflow_run_ref: str = DEFAULT_AIRFLOW_RUN_REF) -> dict[str, Any]:
             from datetime import datetime, timezone
 
             from services.common.metrics import record_ingestion_lag
@@ -122,7 +122,7 @@ def ingest_oltp_to_stg() -> None:
                     f"{order_sql} LIMIT {spec['batch_size']}"
                 )
                 rows = fetch_all("postgres_oltp", sql, params)
-                rows_with_meta = [(*row, run_id) for row in rows]
+                rows_with_meta = [(*row, airflow_run_ref) for row in rows]
                 target_columns = list(spec["columns"]) + ["source_run_id"]
                 inserted = bulk_insert(
                     "postgres_dwh",
@@ -184,7 +184,7 @@ def ingest_oltp_to_stg() -> None:
         extract_table.expand(spec=specs)
 
     @task(outlets=[DS_RAW_OLTP], trigger_rule=TriggerRule.NONE_FAILED)
-    def publish_signal(run_id: str = DEFAULT_RUN_ID) -> dict[str, Any]:
+    def publish_signal(airflow_run_ref: str = DEFAULT_AIRFLOW_RUN_REF) -> dict[str, Any]:
         from services.common.logging_utils import get_logger
 
         logger = get_logger(DAG_ID)
@@ -195,7 +195,7 @@ def ingest_oltp_to_stg() -> None:
         notify_dbt_web(
             event=EVENT_INGESTION_COMPLETED,
             dag_id=DAG_ID,
-            run_id=run_id,
+            run_id=airflow_run_ref,
             target_layer="raw.oltp",
         )
         return {"dag": DAG_ID, "status": "published"}

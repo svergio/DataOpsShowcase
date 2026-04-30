@@ -1,0 +1,29 @@
+domains:
+  - id: ingestion
+    title: Ingestion
+    summary: Sources from OLTP, Kafka files, MinIO raw landing.
+    atlas_tag: ingestion
+  - id: raw
+    title: Raw and landing zones
+    summary: Minimal parsing, conformance to schemas.
+    atlas_tag: raw
+  - id: staging
+    title: Staging harmonization
+    summary: Cleansed intermediates feeding DWH tooling.
+    atlas_tag: staging
+  - id: marts
+    title: Analytical marts and serving layers
+    summary: Vault, marts, Superset exposures.
+    atlas_tag: marts
+  - id: streaming
+    title: Streaming and CDC
+    summary: Kafka topics produced by generators or Debezium.
+    atlas_tag: streaming
+  - id: analytics
+    title: Analytics and experimentation
+    summary: Metrics, dashboards, experimentation outputs.
+    atlas_tag: analytics
+  - id: core
+    title: Core reference data
+    summary: Slowly changing reference entities reused across pipelines.
+    atlas_tag: core

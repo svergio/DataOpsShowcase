@@ -105,6 +105,7 @@ class Config:
     minio_prefix_catalog: str
 
     enable_extensions: bool
+    oltp_extensions_sql: str
     generator_config_dir: str
     kafka_topic_marketing_email: str
     kafka_topic_seo_organic: str
@@ -136,6 +137,7 @@ def _baseline() -> Dict[str, Any]:
         "enable_redis": True,
         "enable_minio": True,
         "enable_extensions": True,
+        "oltp_extensions_sql": "",
         "generator_config_dir": "/app/configs/generators",
         "kafka_topic_clickstream": "techmart.events.clickstream",
         "kafka_topic_orders": "techmart.events.orders",
@@ -289,6 +291,12 @@ def load_config() -> Config:
             "raw/product_catalog",
         ),
         enable_extensions=_pick_bool("GENERATOR_ENABLE_EXTENSIONS", merged, "enable_extensions", True),
+        oltp_extensions_sql=_pick_str(
+            "OLTP_EXTENSIONS_SQL",
+            merged,
+            "oltp_extensions_sql",
+            "",
+        ),
         generator_config_dir=_pick_str(
             "GENERATOR_CONFIG_DIR",
             merged,

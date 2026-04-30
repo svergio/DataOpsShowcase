@@ -1,0 +1,10 @@
+ownership:
+  - domain_id: ingestion
+    steward_team: PlatformIngestion
+    technical_owner: data-platform@example.com
+  - domain_id: marts
+    steward_team: AnalyticsEngineering
+    technical_owner: analytics@example.com
+  - domain_id: streaming
+    steward_team: StreamingFabric
+    technical_owner: streaming@example.com

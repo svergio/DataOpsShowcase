@@ -1,0 +1,23 @@
+{
+  "name": "postgres-metadb-mlflow",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "tasks.max": "1",
+    "database.hostname": "postgres_metadb",
+    "database.port": "5432",
+    "database.user": "debezium_meta",
+    "database.password": "debezium_meta_pass",
+    "database.dbname": "mlflow",
+    "topic.prefix": "cdc_meta_mlflow",
+    "slot.name": "debezium_metadb_mlflow_slot",
+    "publication.name": "dbz_pub_mlflow",
+    "plugin.name": "pgoutput",
+    "schema.include.list": "public",
+    "table.include.list": "public.*",
+    "heartbeat.interval.ms": "10000",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter.schemas.enable": "false"
+  }
+}

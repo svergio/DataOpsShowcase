@@ -9,8 +9,7 @@
 | Куда | URL (пример) |
 |------|----------------|
 | Сеть compose | `http://dbt-web-backend:8010` |
-| С хоста (порт из `.env`, по умолчанию) | `http://localhost:8010` |
-| Через ingress (рекомендуется) | `http://localhost:${INGRESS_PORT}/dbt-web/` — UI, `.../dbt-api/v1/...` — тот же backend под префиксом для API |
+| С хоста | Только через ingress: UI `http://localhost:${INGRESS_PORT}/dbt/`, API `.../dbt-api/v1/...` (прямой порт 8010 на хост не публикуется) |
 
 - OpenAPI-спека: [services/dbt_web/openapi/dbt_web.openapi.yaml](../services/dbt_web/openapi/dbt_web.openapi.yaml)
 
@@ -28,9 +27,13 @@
 
 ## dbt REST (внешний запуск dbt)
 
-Используется оркестратором, не путать с **dbt-web** (UI).
+Используется оркестратором и проксируется из **dbt-web**, не путать с HTML/UI того же dbt-web.
 
-- Внутри сети: `http://dbt-rest:8580` (см. `docker-compose` и `DBT_REST_BASE_URL` в `.env`).
+- Сервис в [`docker-compose.yml`](../docker-compose.yml): **`dbt-rest`** (`container_name: dbt-rest`), порт **8580** только внутри сети compose. Реализация: [`services/dbt_rest/`](../services/dbt_rest/) (FastAPI, версия `dbt-core`/`dbt-postgres` = **`DBT_IMAGE_TAG`**). **`GET /health`**: `200` и `"database":"ok"` при успешном `SELECT 1` к мета-БД; **`503`** если **`DBT_REST_DB_DSN`** не задан или PostgreSQL недоступен (удобно для Docker healthcheck). **`run_id`** в путях должен быть валидным UUID — иначе **`400`**. **Метаданные прогонов** (статус, время, имена артефактов, логи) хранятся в PostgreSQL **`postgres_metadb`**, БД **`${PG_META_DB}`** (схема `dbt_rest`); тела артефактов — в каталоге проекта **`dbt/target/runs/{run_id}/`** на смонтированном томе. Завершение прогона в БД делается с повторными попытками и резервным `UPDATE`, чтобы строка не зависала в **`running`** при временных сбоях Postgres.
+- **Airflow** (клиент [`services/dbt_client/rest_client.py`](../services/dbt_client/rest_client.py)): **`POST /runs`** — тело `job`, `selectors`, `target` (профиль), `command`, `fail_on_test_failure` и т.д.; без непустого **`command`** требуется **непустой `selectors`** (иначе 400 — защита от прогона всего проекта). При типовом пути с `selectors` используется **`dbt build`**, при `fail_on_test_failure: false` добавляется **`--no-fail-fast`**. **`GET /runs/{id}`** — статус; **`GET /runs/{id}/logs`** — текст лога.
+- **dbt-web backend** (клиент [`services/dbt_web/backend/app/clients/dbt_rest_client.py`](../services/dbt_web/backend/app/clients/dbt_rest_client.py) при `DBT_REST_BASE_URL=http://dbt-rest:8580`): **`POST /jobs/run/{staging|vault|marts}`** — тело JSON опционально (пустое тело допустимо); поля как `RunJobRequest` (selectors, vars, full_refresh, defer, fail_on_test_failure), по умолчанию селектор `tag:<слой>`; для `selectors` используется тот же **`dbt build`** / **`--no-fail-fast`**, что и у Airflow. **`GET /runs/{id}/status`**, **`GET /runs/{id}/logs`**, **`GET /artifacts/{id}/{manifest.json|catalog.json|run_results.json|graph.js}`** — для UI, обновления lineage/manifest в dbt-web; `catalog.json` и `graph.js` чаще появляются после `dbt docs generate` (DAG `dataops_docs`).
+- URL: `http://dbt-rest:8580` или переопределение через **`DBT_REST_BASE_URL`** в `.env`. При непустом **`DBT_REST_TOKEN`** передавайте заголовок `Authorization: Bearer …` на все вызовы API.
+- **Имя Docker-сети:** в compose задано логическое имя **`dataops_net`**. На хосте сеть обычно отображается как **`<имя_проекта>_dataops_net`** (см. `docker compose ls`, `docker network ls`); при подключении сторонних контейнеров используйте полное имя.
 
 ## Единая точка входа: ingress (nginx)
 
@@ -38,16 +41,26 @@
 
 | Префикс | Назначение |
 |---------|------------|
-| `/dbt-web/` | UI dbt-web (сессия, страницы runs/models/lineage/…) |
+| `/dbt/` | UI dbt-web (сессия, страницы runs/models/lineage/…) |
+| `/dbt-web/…` | Редирект 301 на `/dbt/…` |
 | `/dbt-api/v1/…` | Тот же backend dbt-web: API (удобно для единого origin) |
 | `/airflow/` | Airflow Web UI |
 | `/mlflow/` | MLflow UI |
 | `/grafana/` | Grafana |
+| `/superset/` | Apache Superset |
+| `/jupyter/` | Jupyter Notebook / Lab (`base_url=/jupyter/`) |
+| `/prometheus/` | Prometheus Web UI за nginx (бекенд без subpath на `prometheus:9090`) |
+| `/pushgateway/` | Pushgateway |
+| `/spark-master/` / `/spark-worker/` | Spark standalone UI |
+| `/minio-console/` | Консоль MinIO (API S3 — порт `MINIO_PORT`) |
+| `/atlas/` | Apache Atlas — веб-UI и REST/API (overlay) |
+| `/schema-registry/` | Schema Registry REST (JSON; не полноценный UI; CDC overlay) |
+| `/kafka-connect/` | Kafka Connect / Debezium REST (JSON; CDC overlay) |
 
 Примеры:
 
 ```text
-http://localhost:8090/dbt-web/
+http://localhost:8090/dbt/
 http://localhost:8090/dbt-api/v1/health
 http://localhost:8090/airflow/
 ```
@@ -55,6 +68,7 @@ http://localhost:8090/airflow/
 ## Настройки
 
 - Переменные: `.env`, шаблон `.env.example`
+- **dbt-rest:** в compose задаётся **`DBT_REST_DB_DSN`** → `postgres_metadb` / `${PG_META_DB}`; локально см. комментарий к `DBT_REST_DB_DSN` в `.env.example`
 - Сборка: [docker-compose.yml](../docker-compose.yml)
 
 ## См. также

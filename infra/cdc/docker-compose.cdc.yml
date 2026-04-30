@@ -1,0 +1,59 @@
+services:
+  schema_registry:
+    image: confluentinc/cp-schema-registry:${CP_SCHEMA_REGISTRY_TAG:-7.6.1}
+    hostname: schema_registry
+    container_name: schema_registry
+    restart: unless-stopped
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema_registry
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:9092
+      SCHEMA_REGISTRY_DEBUG: "true"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test:
+        ["CMD-SHELL", "curl -fsS http://localhost:8081/subjects >/dev/null"]
+      interval: 20s
+      timeout: 10s
+      retries: 20
+      start_period: 45s
+    networks:
+      - dataops_net
+
+  debezium_connect:
+    image: debezium/connect:${DEBEZIUM_CONNECT_TAG:-2.5}
+    hostname: debezium_connect
+    container_name: debezium_connect
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+      schema_registry:
+        condition: service_healthy
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: ${DEBEZIUM_GROUP_ID:-debezium-cluster}
+      CONFIG_STORAGE_TOPIC: debezium_connect_configs
+      OFFSET_STORAGE_TOPIC: debezium_connect_offsets
+      STATUS_STORAGE_TOPIC: debezium_connect_status
+      CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      STATUS_STORAGE_REPLICATION_FACTOR: 1
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_PLUGIN_PATH: /kafka/connect
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8083/connectors >/dev/null 2>&1"]
+      interval: 20s
+      timeout: 10s
+      retries: 30
+      start_period: 90s
+    networks:
+      - dataops_net
+
+networks:
+  dataops_net:
+    external: true
+    name: ${ATLAS_EXTERNAL_NETWORK:-dataopsshowcase_dataops_net}

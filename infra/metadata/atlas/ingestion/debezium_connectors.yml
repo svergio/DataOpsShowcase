@@ -1,0 +1,33 @@
+---
+connector_names:
+  - postgres-oltp
+  - postgres-olap
+  - postgres-metadb-airflow
+  - postgres-metadb-superset
+  - postgres-metadb-mlflow
+entities:
+  - typeName: Process
+    attributes:
+      name: debezium_connector_postgres_oltp
+      qualifiedName: "debezium://dataops@dataops_net/postgres-oltp"
+      description: Debezium connector for OLTP Postgres; topic.prefix aligns with kafka CDC topics published separately.
+  - typeName: Process
+    attributes:
+      name: debezium_connector_postgres_olap
+      qualifiedName: "debezium://dataops@dataops_net/postgres-olap"
+      description: Debezium connector for OLAP Postgres staging/metadata flows.
+  - typeName: Process
+    attributes:
+      name: debezium_connector_postgres_metadb_airflow
+      qualifiedName: "debezium://dataops@dataops_net/postgres-metadb-airflow"
+      description: Debezium tap on Airflow metadata DB (cdc_meta_* topics).
+  - typeName: Process
+    attributes:
+      name: debezium_connector_postgres_metadb_superset
+      qualifiedName: "debezium://dataops@dataops_net/postgres-metadb-superset"
+      description: Debezium tap on Superset Postgres metadata schema.
+  - typeName: Process
+    attributes:
+      name: debezium_connector_postgres_metadb_mlflow
+      qualifiedName: "debezium://dataops@dataops_net/postgres-metadb-mlflow"
+      description: Debezium tap on MLflow Postgres metadata backing store.

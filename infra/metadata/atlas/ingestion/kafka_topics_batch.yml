@@ -1,0 +1,14 @@
+---
+entities:
+  - typeName: kafka_topic
+    attributes:
+      name: cdc_oltp_orders
+      topic: cdc_oltp.public.orders
+      qualifiedName: "kafka://dataops@dataops_net/cdc_oltp.public.orders"
+      uri: "kafka://kafka:9092/cdc_oltp.public.orders"
+  - typeName: kafka_topic
+    attributes:
+      name: cdc_olap_stg_orders
+      topic: cdc_olap.public.stg_orders
+      qualifiedName: "kafka://dataops@dataops_net/cdc_olap.public.stg_orders"
+      uri: "kafka://kafka:9092/cdc_olap.public.stg_orders"

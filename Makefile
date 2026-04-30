@@ -1,4 +1,4 @@
-.PHONY: smoke smoke-ingress p0-verify dqc-help
+.PHONY: smoke smoke-ingress p0-verify dqc-help run-dqc
 
 ROOT := $(CURDIR)
 
@@ -11,4 +11,9 @@ p0-verify:
 	@$(ROOT)/scripts/p0_verify.sh
 
 dqc-help:
-	@echo "Independent DQC: see monitoring/quality/README.md"
+	@echo "Tests and DQ: docs/TESTING_AND_DATA_QUALITY.md"
+	@echo "Run DQC (needs dbt CLI + OLAP): make run-dqc"
+
+run-dqc:
+	@chmod +x $(ROOT)/scripts/run_dqc.sh
+	@$(ROOT)/scripts/run_dqc.sh

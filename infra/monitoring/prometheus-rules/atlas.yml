@@ -1,0 +1,10 @@
+groups:
+  - name: atlas_catalog_rules
+    rules:
+      - alert: AtlasQualityGateReportsFailure
+        expr: dataops_atlas_gate_ok{job="atlas_quality"} == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Atlas quality gate metric reports failure.

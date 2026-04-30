@@ -16,6 +16,7 @@ erDiagram
     ORDER_EVENT ||--o{ PAYMENT_EVENT : "order_id"
     ORDER_EVENT ||--o{ SHIPMENT_EVENT : "order_id"
     ORDER_EVENT ||--|{ ORDER_ITEM : "embeds"
+    ORDER_EVENT ||--o| ORDER_COMMERCIAL : "` commercial `"
 
     CLICKSTREAM_TOPIC {
         string name "techmart.events.clickstream"
@@ -64,6 +65,16 @@ erDiagram
         string currency
         int items_count
     }
+    ORDER_COMMERCIAL {
+        decimal subtotal_before_discount
+        decimal discount_amount
+        string coupon_code
+        bigint campaign_id "` soft `"
+        string legacy_campaign_code
+        string legacy_order_ref
+        string order_lineage "canonical|legacy_stub"
+        string crm_customer_key
+    }
     ORDER_ITEM {
         bigint product_id
         string sku
@@ -102,8 +113,7 @@ erDiagram
 
 ## Соглашения
 
-- Сериализация: JSON (UTF-8) с `linger.ms=50`, `compression.type=lz4`,
-  `enable.idempotence=true`.
+- Сериализация: JSON (UTF-8) с `linger.ms=50`, `compression.type=lz4`; продюсер включает **`enable.idempotence=false`** (устойчивость длинных прогонов в Docker — см. [`kafka_producer.py`](../../generators/infrastructure/connectors/kafka_producer.py)).
 - Ключи: для clickstream — `session_id`, для остальных топиков — id основной сущности.
 - Все события несут `event_id` (UUID-производный) для дедупликации downstream.
 - Идемпотентность: события могут повторяться, но `event_id` уникален в пределах потока.
@@ -113,10 +123,11 @@ erDiagram
 - `ORDER_EVENT.order_id` ↔ `PAYMENT_EVENT.order_id` ↔ `SHIPMENT_EVENT.order_id`.
 - `CLICKSTREAM_EVENT.customer_id` ↔ `ORDER_EVENT.customer_id`.
 - `ORDER_EVENT.items[*].product_id` ↔ записи в OLTP `products.product_id`.
+- Объект **`commercial`** (в теле `ORDER_EVENT`) совпадает по смыслу с OLTP-колонками заказа (`subtotal`, скидки, линия `legacy_*`) — см. [`02c_oltp_retail_legacy.sql`](../../services/postgres/init/02c_oltp_retail_legacy.sql).
 
 ## Расширенные топики (генератор)
 
-Имена по умолчанию задаются в [.env.example](../../.env.example) / [generators/common/config.py](../../generators/common/config.py):
+На блок-схеме выше они не показаны отдельными «топик-сущностями» — ниже имена по умолчанию из [.env.example](../../.env.example) / [generators/common/config.py](../../generators/common/config.py). События несут FK-подобные ключи (кампании в email-, SEO-, HR-событиях); стыковка с DWH через те же id, что попадают в OLTP после ingestion.
 
 | Топик (default) | Назначение |
 |-----------------|------------|

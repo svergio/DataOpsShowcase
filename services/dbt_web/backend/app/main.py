@@ -32,11 +32,12 @@ def _root_dir() -> str:
 
 def create_app() -> Flask:
     root = _root_dir()
+    _ui = settings.dbt_web_ui_url_prefix
     app = Flask(
         __name__,
         template_folder=os.path.join(root, "templates"),
         static_folder=os.path.join(root, "static"),
-        static_url_path="/dbt-web/static",
+        static_url_path=f"{_ui}/static",
     )
     app.config["SECRET_KEY"] = settings.dbt_web_secret_key
 
@@ -48,7 +49,7 @@ def create_app() -> Flask:
     app.extensions["dbt_ctx"] = state
 
     app.register_blueprint(api_v1.bp, url_prefix="/api/v1")
-    app.register_blueprint(ui.bp, url_prefix="/dbt-web")
+    app.register_blueprint(ui.bp, url_prefix=_ui)
 
     @app.errorhandler(DbtWebError)
     def handle_dbt_web_error(exc: DbtWebError) -> Tuple[Any, int]:

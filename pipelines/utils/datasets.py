@@ -6,6 +6,7 @@ DS_RAW_OLTP = Dataset("postgres://postgres_dwh/raw/oltp")
 DS_RAW_KAFKA_ORDERS = Dataset("postgres://postgres_dwh/raw/kafka_orders")
 DS_RAW_KAFKA_PAYMENTS = Dataset("postgres://postgres_dwh/raw/kafka_payments")
 DS_RAW_MINIO_FILES = Dataset("postgres://postgres_dwh/raw/minio_files")
+DS_RAW_KAFKA_EXTENSIONS = Dataset("postgres://postgres_dwh/raw/kafka_extensions")
 
 DS_STG_CLEAN = Dataset("postgres://postgres_dwh/staging/clean")
 

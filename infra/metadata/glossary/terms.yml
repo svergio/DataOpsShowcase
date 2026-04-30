@@ -1,0 +1,25 @@
+terms:
+  - canonical: customer_id
+    title: Customer
+    description: Loyalty/account identifier shared across OLTP/DWH journeys.
+    domain_ids: [core]
+  - canonical: order_id
+    title: Sales order
+    description: Canonical order header key for revenue funnels.
+    domain_ids: [ingestion, marts]
+  - canonical: event_stream
+    title: Behavioural event stream
+    description: Synthetic clickstream/order/payment envelopes from Kafka payloads.
+    domain_ids: [streaming]
+  - canonical: transactional_event
+    title: Monetary transaction record
+    description: Settlement or PSP transaction references.
+    domain_ids: [ingestion]
+  - canonical: warehouse_bucket
+    title: Warehouse storage prefix
+    description: Structured prefix inside MinIO or object storage lineage.
+    domain_ids: [raw]
+  - canonical: cdc_payload
+    title: CDC change payload
+    description: JSON or Avro Debezium record mirroring Postgres mutations.
+    domain_ids: [streaming]

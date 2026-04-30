@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from app.core.config import settings
 from app.main import app
 
 @pytest.fixture()
@@ -22,5 +23,5 @@ def test_metrics_endpoint(client) -> None:
 
 
 def test_login_get(client) -> None:
-    r = client.get("/dbt-web/login")
+    r = client.get(f"{settings.dbt_web_ui_url_prefix}/login")
     assert r.status_code == 200

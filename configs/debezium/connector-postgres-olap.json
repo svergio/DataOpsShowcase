@@ -1,0 +1,23 @@
+{
+  "name": "postgres-olap",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "tasks.max": "1",
+    "database.hostname": "postgres_olap",
+    "database.port": "5432",
+    "database.user": "debezium_olap",
+    "database.password": "debezium_olap_pass",
+    "database.dbname": "techmart_dwh",
+    "topic.prefix": "cdc_olap",
+    "slot.name": "debezium_olap_slot",
+    "publication.name": "dbz_publication_olap",
+    "plugin.name": "pgoutput",
+    "schema.include.list": "public,meta",
+    "table.include.list": "public.*,meta.*",
+    "heartbeat.interval.ms": "10000",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter.schemas.enable": "false"
+  }
+}

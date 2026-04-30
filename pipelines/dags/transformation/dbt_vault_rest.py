@@ -6,7 +6,11 @@ from airflow.decorators import dag, task
 
 from pipelines.dags.transformation._dbt_common import run_dbt_layer
 from pipelines.utils.dag_factory import default_args
-from pipelines.utils.datasets import DS_DBT_STAGING_DONE, DS_DBT_VAULT_DONE
+from pipelines.utils.datasets import (
+    DS_DBT_STAGING_DONE,
+    DS_DBT_VAULT_DONE,
+    DS_RAW_KAFKA_EXTENSIONS,
+)
 from pipelines.utils.dbt_web_webhook import EVENT_DATAVAULT_COMPLETED, notify_dbt_web
 
 DAG_ID = "dag_dbt_vault_rest"
@@ -15,7 +19,7 @@ DAG_ID = "dag_dbt_vault_rest"
 @dag(
     dag_id=DAG_ID,
     description="Trigger dbt vault models via REST API",
-    schedule=[DS_DBT_STAGING_DONE],
+    schedule=(DS_DBT_STAGING_DONE | DS_RAW_KAFKA_EXTENSIONS),
     start_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
     catchup=False,
     max_active_runs=1,

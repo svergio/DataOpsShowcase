@@ -62,10 +62,26 @@ class StreamingGenerator:
         log.info("Stop signal received, finishing current tick")
         self._stop = True
 
+    def _campaign_ids_for_orders(self) -> List[int]:
+        if not self.oltp or not self.cfg.enable_extensions:
+            return []
+        try:
+            return self.oltp.fetch_campaign_ids()
+        except Exception:
+            return []
+
     def _init_connectors(self) -> None:
         if self.cfg.enable_oltp:
             self.oltp = OltpWriter(self.cfg.oltp_dsn)
             self.oltp.connect()
+            if self.cfg.enable_extensions:
+                ddl_path = self.cfg.oltp_extensions_sql.strip()
+                if not ddl_path:
+                    ddl_path = "/app/sql/02b_oltp_marketing_hr_finance.sql"
+                self.oltp.ensure_extension_tables(ddl_path)
+            self.oltp.ensure_extension_tables(
+                "/app/sql/02c_oltp_retail_legacy.sql"
+            )
         if self.cfg.enable_kafka:
             self.kafka = KafkaPublisher(self.cfg.kafka_bootstrap)
             topics = {
@@ -109,6 +125,13 @@ class StreamingGenerator:
         users = [
             self.factory.make_user(user_id=i + 1) for i in range(self.cfg.seed_users)
         ]
+        for u in users:
+            if self.rng.random() < 0.7:
+                u.legacy_crm_customer_id = (
+                    f"CRM-{self.rng.randint(1_000_000, 9_999_999)}"
+                )
+            else:
+                u.legacy_crm_customer_id = None
         products: List[ProductRef] = []
         for i in range(self.cfg.seed_products):
             seller = self.rng.choice(sellers)
@@ -175,11 +198,11 @@ class StreamingGenerator:
             )
             items_meta: List[Dict[str, Any]] = []
             db_items: List[tuple] = []
-            total = 0.0
+            raw_subtotal = 0.0
             for prod in chosen_products:
                 qty = self.rng.choices([1, 2, 3], weights=[80, 15, 5], k=1)[0]
                 line_total = round(prod.price * qty, 2)
-                total += line_total
+                raw_subtotal += line_total
                 items_meta.append(
                     {
                         "product_id": prod.product_id,
@@ -192,18 +215,84 @@ class StreamingGenerator:
                 )
                 db_items.append((prod.product_id, qty, prod.price))
 
+            raw_subtotal = round(raw_subtotal, 2)
+            legacy_mode = self.rng.random() < 0.3
+            disc_amt = 0.0
+            coupon: str | None = None
+            camp_id: int | None = None
+            leg_cc: str | None = None
+            leg_ref: str | None = None
+            lineage = "canonical"
+
+            if legacy_mode:
+                lineage = "legacy_stub"
+                disc_amt = round(
+                    raw_subtotal * self.rng.uniform(0.0, 0.14), 2
+                )
+                if self.rng.random() < 0.35:
+                    disc_amt = 0.0
+                final_total = round(raw_subtotal - disc_amt, 2)
+                coupon = self.rng.choice(
+                    ["SAVE15", "WELCOME", None, "EXPIRED2020", ""]
+                )
+                if coupon == "":
+                    coupon = None
+                leg_cc = (
+                    f"LEG-{self.rng.randint(1000, 9999)}"
+                    f"-SF-{self.rng.choice(['A', 'B'])}"
+                )
+                leg_ref = (
+                    f"POS-{self.rng.randint(1_000_000, 9_999_999)}"
+                    f"-{self.rng.randint(10, 99)}"
+                )
+            else:
+                if self.rng.random() < 0.5:
+                    disc_amt = round(
+                        raw_subtotal * self.rng.uniform(0.02, 0.16),
+                        2,
+                    )
+                final_total = round(raw_subtotal - disc_amt, 2)
+                coupon = self.rng.choice([None, None, "WELCOME10", "BULK5"])
+                cands = self._campaign_ids_for_orders()
+                if cands and self.rng.random() < 0.55:
+                    camp_id = self.rng.choice(cands)
+
+            commercial = {
+                "subtotal_before_discount": raw_subtotal,
+                "discount_amount": disc_amt,
+                "coupon_code": coupon,
+                "campaign_id": camp_id,
+                "legacy_campaign_code": leg_cc if legacy_mode else None,
+                "legacy_order_ref": leg_ref if legacy_mode else None,
+                "order_lineage": lineage,
+                "crm_customer_key": getattr(user, "legacy_crm_customer_id", None),
+            }
+
             order_id = 0
             if self.oltp:
                 order_id = self.oltp.insert_order(
                     user_id=user.user_id,
                     currency_code=user.currency,
-                    total_amount=round(total, 2),
+                    total_amount=final_total,
                     status="PENDING",
                     items=db_items,
+                    coupon_code=coupon,
+                    campaign_id=camp_id,
+                    legacy_campaign_code=leg_cc,
+                    legacy_order_ref=leg_ref,
+                    subtotal_before_discount=raw_subtotal,
+                    discount_amount=disc_amt,
+                    order_lineage=lineage,
                 )
 
             order_payload = build_order_payload(
-                self.rng, self.state, user, items_meta, order_id, total
+                self.rng,
+                self.state,
+                user,
+                items_meta,
+                order_id,
+                final_total,
+                commercial=commercial,
             )
             if self.kafka:
                 self.kafka.publish(
@@ -221,7 +310,7 @@ class StreamingGenerator:
                 user,
                 order_id,
                 self._payment_seq,
-                total,
+                final_total,
             )
             self._payment_seq += 1
             if self.kafka:

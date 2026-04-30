@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Портал DataOpsShowcase</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}" />
+</head>
+<body>
+  <div class="shell">
+    <header class="hero">
+      <div class="hero-inner">
+        <div class="hero-copy">
+          <h1 class="app-title">DataOpsShowcase</h1>
+          <p class="hero-lead">
+            Песочница полного контура Data Platform: от OLTP, Kafka и MinIO к Airflow, Spark, dbt, витринам, MLflow и наблюдаемости; единый nginx ingress.
+            Ниже: слева карта контейнеров и легенда, затем веб-интерфейсы и блок «API и внутренняя сеть». Подробнее см. README в корне репозитория.
+          </p>
+          {% if portal_data.docker_error %}
+          <p class="hero-warn">Нет доступа к Docker API. {{ portal_data.docker_error }}</p>
+          {% endif %}
+        </div>
+      </div>
+    </header>
+
+    <section class="panel map-legend-panel">
+      <div class="panel-head panel-head-map">
+        <h2 class="panel-title">Карта контейнеров</h2>
+        <button type="button" class="btn-graph-reset" id="btn-graph-reset" aria-label="Сбросить масштаб и расположение узлов">
+          Сброс вида
+        </button>
+      </div>
+      <div class="map-legend-grid">
+        <div class="map-column">
+          <div class="viz-wrap">
+            <svg id="c4" class="c4-svg" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid meet">
+              <g class="zoom-layer"></g>
+            </svg>
+          </div>
+        </div>
+        <aside class="legend-container" aria-label="Легенда карты">
+          <section class="legend-section">
+            <h3 class="legend-title"><span class="legend-idx">1</span> Типы проб</h3>
+            <div class="legend-mini-map">
+              <div class="legend-mini-horizontal" aria-hidden="true">
+                <span class="dot sm legend-mini-dot legend-mini-dot-p1"></span>
+                <span class="dot sm legend-mini-dot legend-mini-dot-p2"></span>
+                <span class="dot sm legend-mini-dot legend-mini-dot-p3"></span>
+              </div>
+              <div class="legend-mini-rows">
+                <span class="dot sm legend-mini-dot legend-mini-dot-p1" aria-hidden="true"></span>
+                <span class="legend-mini-line"><span class="legend-mini-num">1</span> — процесс контейнера</span>
+                <span class="dot sm legend-mini-dot legend-mini-dot-p2" aria-hidden="true"></span>
+                <span class="legend-mini-line"><span class="legend-mini-num">2</span> — healthcheck compose</span>
+                <span class="dot sm legend-mini-dot legend-mini-dot-p3" aria-hidden="true"></span>
+                <span class="legend-mini-line"><span class="legend-mini-num">3</span> — HTTP-probe</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="legend-section">
+            <h3 class="legend-title"><span class="legend-idx">2</span> Расшифровка цветов</h3>
+            <div class="legend-decode">
+              <div class="legend-decode-row"><span class="dot sm ok"></span><span>норма</span></div>
+              <div class="legend-decode-row"><span class="dot sm warn"></span><span>старт / риск</span></div>
+              <div class="legend-decode-row"><span class="dot sm bad"></span><span>ошибка</span></div>
+              <div class="legend-decode-row"><span class="dot sm unknown"></span><span>нет данных</span></div>
+              <div class="legend-decode-row"><span class="dot sm done"></span><span>init завершён</span></div>
+            </div>
+          </section>
+
+          <section class="legend-section">
+            <h3 class="legend-title"><span class="legend-idx">3</span> Статусы узла</h3>
+            <div class="legend-node-decode">
+              <div class="legend-node-row"><span class="legend-node-swatch legend-node-healthy"></span><span>норма</span></div>
+              <div class="legend-node-row"><span class="legend-node-swatch legend-node-running"></span><span>работа</span></div>
+              <div class="legend-node-row"><span class="legend-node-swatch legend-node-degraded"></span><span>риск</span></div>
+              <div class="legend-node-row"><span class="legend-node-swatch legend-node-none"></span><span>нет</span></div>
+              <div class="legend-node-row"><span class="legend-node-swatch legend-node-completed"></span><span>готов (init)</span></div>
+            </div>
+          </section>
+
+          <section class="legend-section">
+            <h3 class="legend-title"><span class="legend-idx">4</span> Типы узлов</h3>
+            <div class="legend-shapes">
+              <div class="shape-item"><svg class="legend-icon" viewBox="-40 -35 80 75" aria-hidden="true"><ellipse cx="0" cy="-18" rx="14" ry="4" fill="#e2e8f0" stroke="#94a3b8"/><rect x="-14" y="-18" width="28" height="14" fill="#dbeafe" stroke="#94a3b8"/><ellipse cx="0" cy="-4" rx="14" ry="4" fill="#dbeafe" stroke="#94a3b8"/></svg><span>БД</span></div>
+              <div class="shape-item"><svg class="legend-icon" viewBox="-40 -35 80 75" aria-hidden="true"><path d="M-18,-12 L16,-12 L20,0 L16,12 L-18,12 L-22,0 Z" fill="#dbeafe" stroke="#94a3b8"/></svg><span>брокер</span></div>
+              <div class="shape-item"><svg class="legend-icon" viewBox="-40 -35 80 75" aria-hidden="true"><path d="M-16,-8 L16,-8 L14,14 L-14,14 Z" fill="#dbeafe" stroke="#94a3b8"/></svg><span>объект</span></div>
+              <div class="shape-item"><svg class="legend-icon" viewBox="-40 -35 80 75" aria-hidden="true"><rect x="-16" y="-12" width="32" height="24" rx="4" fill="#dbeafe" stroke="#94a3b8"/></svg><span>кэш</span></div>
+              <div class="shape-item"><svg class="legend-icon" viewBox="-40 -35 80 75" aria-hidden="true"><path d="M-18,-14 L18,-14 L16,14 L-16,14 Z" fill="#dbeafe" stroke="#94a3b8"/></svg><span>шлюз</span></div>
+              <div class="shape-item"><svg class="legend-icon" viewBox="-40 -35 80 75" aria-hidden="true"><circle r="14" fill="#dbeafe" stroke="#94a3b8"/><circle r="4" fill="none" stroke="#94a3b8"/></svg><span>оркестр.</span></div>
+              <div class="shape-item"><svg class="legend-icon" viewBox="-40 -35 80 75" aria-hidden="true"><rect x="-16" y="-12" width="32" height="24" rx="3" fill="#dbeafe" stroke="#94a3b8"/></svg><span>вычисл.</span></div>
+              <div class="shape-item"><svg class="legend-icon" viewBox="-40 -35 80 75" aria-hidden="true"><polygon points="0,-14 12,-4 12,8 0,14 -12,8 -12,-4" fill="#dbeafe" stroke="#94a3b8"/></svg><span>метрики</span></div>
+              <div class="shape-item"><svg class="legend-icon" viewBox="-40 -35 80 75" aria-hidden="true"><rect x="-18" y="-10" width="36" height="20" rx="3" fill="#dbeafe" stroke="#94a3b8" stroke-dasharray="3 2"/></svg><span>batch</span></div>
+              <div class="shape-item"><svg class="legend-icon" viewBox="-40 -35 80 75" aria-hidden="true"><path d="M-20,0 L-10,-17 L10,-17 L20,0 L10,17 L-10,17 Z" fill="#2563eb" stroke="#1d4ed8" stroke-width="1.5"/></svg><span>веб</span></div>
+            </div>
+          </section>
+
+          <section class="legend-section legend-section-last">
+            <h3 class="legend-title"><span class="legend-idx">5</span> Управление картой</h3>
+            <div class="legend-mechanics">
+              <div class="legend-mechanic">
+                <svg class="legend-mechanic-icon" viewBox="0 0 20 20" aria-hidden="true"><ellipse cx="10" cy="10" rx="5" ry="7" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M10 3v2.5M10 14.5V17" stroke="currentColor" stroke-width="1" stroke-linecap="round"/><path d="M7 6.5c-.8 1.2-.8 2.8 0 4M13 6.5c.8 1.2.8 2.8 0 4" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>
+                <span>колёсико — масштаб</span>
+              </div>
+              <div class="legend-mechanic">
+                <svg class="legend-mechanic-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M8.5 4.5c-1.8 0-3.2 1.3-3.3 3v5.5c0 .6.4 1 1 1h1.8l1.2 2.8 1.2-2.8h2.3c.6 0 1-.5 1-1V9c0-2-1.5-3.5-3.5-3.5h-.7z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M11.5 5.5h.5c1.2 0 2.2 1 2.2 2.2v2" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>
+                <span>перетаскивание — сдвиг</span>
+              </div>
+              <div class="legend-mechanic">
+                <svg class="legend-mechanic-icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="5" cy="10" r="2.2" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="15" cy="10" r="2.2" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M7.2 10h5.6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                <span>рёбра — упрощённые связи</span>
+              </div>
+            </div>
+          </section>
+        </aside>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2 class="panel-title">Веб-интерфейсы</h2>
+      </div>
+      <div id="cards-web" class="card-grid"></div>
+    </section>
+
+    <section class="panel panel-api">
+      <div class="panel-head">
+        <h2 class="panel-title">API и внутренняя сеть</h2>
+      </div>
+      <p class="api-intro">
+        Типичные вызовы — из контейнеров по <code>сервис:порт</code>. Часть JSON доступна через ingress для отладки с хоста.
+      </p>
+      <div id="cards-api" class="card-grid card-grid-api"></div>
+    </section>
+  </div>
+
+  <script id="portal-data" type="application/json">{{ portal_data | tojson }}</script>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  <script src="{{ url_for('static', filename='js/diagram.js') }}"></script>
+</body>
+</html>

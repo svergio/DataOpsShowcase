@@ -220,7 +220,7 @@ def ingest_minio_files_to_raw() -> None:
         ingest_file.expand(meta=files)
 
     @task(outlets=[DS_RAW_MINIO_FILES])
-    def publish(_: Any = None, run_id: str = "{{ run_id }}") -> dict:
+    def publish(_: Any = None, airflow_run_ref: str = "{{ run_id }}") -> dict:
         from services.common.logging_utils import get_logger
 
         get_logger(DAG_ID).info(
@@ -230,7 +230,7 @@ def ingest_minio_files_to_raw() -> None:
         notify_dbt_web(
             event=EVENT_INGESTION_COMPLETED,
             dag_id=DAG_ID,
-            run_id=run_id,
+            run_id=airflow_run_ref,
             target_layer="raw.minio_files",
         )
         return {"dag": DAG_ID, "status": "published"}

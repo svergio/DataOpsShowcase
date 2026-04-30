@@ -76,8 +76,9 @@ def build_order_payload(
     items: List[Dict[str, Any]],
     order_id: int,
     total_amount: float,
+    commercial: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
-    return {
+    out: Dict[str, Any] = {
         "event_id": f"ord_evt_{uuid.uuid4().hex[:16]}",
         "event_type": "ORDER_CREATED",
         "order_id": order_id,
@@ -93,6 +94,9 @@ def build_order_payload(
         "items": items,
         "metadata": {"source": "data_generator", "triggered_by": "tick"},
     }
+    if commercial:
+        out["commercial"] = commercial
+    return out
 
 
 def build_payment_event(

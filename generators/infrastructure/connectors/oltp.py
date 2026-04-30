@@ -1,13 +1,71 @@
 import logging
 import time
-from typing import Any, Iterable, List, Sequence, Tuple
+from pathlib import Path
+from typing import Any, Iterable, List, Optional, Sequence, Tuple
 
 import psycopg
+from psycopg import sql
 
 from common.factories.reference import ProductRef, SellerRef, UserRef
 
 
 log = logging.getLogger("connectors.oltp")
+
+DEFAULT_EXT_DDL_CANONICAL = Path("/app/sql/02b_oltp_marketing_hr_finance.sql")
+
+def _split_sql_statements(body: str) -> List[str]:
+    lines_out = []
+    for line in body.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("--"):
+            continue
+        lines_out.append(line)
+    blob = "\n".join(lines_out)
+
+    stmts: List[str] = []
+    buf: List[str] = []
+    in_quote = False
+    i = 0
+    while i < len(blob):
+        c = blob[i]
+        if c == "'":
+            if in_quote:
+                if i + 1 < len(blob) and blob[i + 1] == "'":
+                    buf.append("''")
+                    i += 2
+                    continue
+                in_quote = False
+                buf.append("'")
+                i += 1
+                continue
+            in_quote = True
+            buf.append("'")
+            i += 1
+            continue
+        if c == ";" and not in_quote:
+            part = "".join(buf).strip()
+            if part:
+                stmts.append(part + ";")
+            buf = []
+            i += 1
+            continue
+        buf.append(c)
+        i += 1
+    tail = "".join(buf).strip()
+    if tail:
+        stmts.append(tail + (";" if not tail.endswith(";") else ""))
+    return stmts
+
+
+_ALLOWED_EXT_TABLES = frozenset(
+    {
+        "marketing_campaigns",
+        "seo_keywords",
+        "feature_flags",
+        "employees",
+        "general_ledger",
+    }
+)
 
 
 class OltpWriter:
@@ -28,6 +86,42 @@ class OltpWriter:
                 time.sleep(delay)
         raise RuntimeError(f"Cannot connect to OLTP: {last_err}")
 
+    def ensure_extension_tables(self, sql_path: str) -> None:
+        path = Path(sql_path).expanduser()
+        if not path.is_file():
+            alt = DEFAULT_EXT_DDL_CANONICAL
+            if alt.is_file():
+                path = alt
+                log.info("Using bundled OLTP extensions DDL %s", path)
+            else:
+                raise RuntimeError(
+                    "OLTP extensions DDL missing (looked up "
+                    f"{sql_path!s} and {alt}): rebuild the data-generator image "
+                    "(Dockerfile must COPY services/postgres/init/02b_oltp_marketing_hr_finance.sql) "
+                    "or bind-mount that file to /app/sql/02b_oltp_marketing_hr_finance.sql."
+                )
+        body = path.read_text(encoding="utf-8").strip()
+        if not body:
+            return
+        conn = self._require_conn()
+        stmts = _split_sql_statements(body)
+        log.info(
+            "Applying OLTP extension DDL from %s (%s statements)",
+            sql_path,
+            len(stmts),
+        )
+        try:
+            with conn.cursor() as cur:
+                for stmt in stmts:
+                    cur.execute(stmt)
+            log.info("OLTP extension DDL applied")
+        except Exception:
+            log.exception(
+                "OLTP extension DDL failed (%s): ensure Postgres user can CREATE TABLE",
+                sql_path,
+            )
+            raise
+
     def close(self) -> None:
         if self.conn is not None:
             self.conn.close()
@@ -43,14 +137,20 @@ class OltpWriter:
         ids: List[int] = []
         with conn.cursor() as cur:
             for u in users:
+                leg = getattr(u, "legacy_crm_customer_id", None)
                 cur.execute(
                     """
-                    INSERT INTO users (email, full_name)
-                    VALUES (%s, %s)
-                    ON CONFLICT (email) DO UPDATE SET full_name = EXCLUDED.full_name
+                    INSERT INTO users (email, full_name, legacy_crm_customer_id)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (email) DO UPDATE SET
+                      full_name = EXCLUDED.full_name,
+                      legacy_crm_customer_id = COALESCE(
+                          EXCLUDED.legacy_crm_customer_id,
+                          users.legacy_crm_customer_id
+                      )
                     RETURNING user_id;
                     """,
-                    (u.email, u.full_name),
+                    (u.email, u.full_name, leg),
                 )
                 row = cur.fetchone()
                 if row is not None:
@@ -113,16 +213,47 @@ class OltpWriter:
         total_amount: float,
         status: str,
         items: List[Tuple[int, int, float]],
+        *,
+        coupon_code: str | None = None,
+        campaign_id: int | None = None,
+        legacy_campaign_code: str | None = None,
+        legacy_order_ref: str | None = None,
+        subtotal_before_discount: float | None = None,
+        discount_amount: float = 0.0,
+        order_lineage: str = "canonical",
     ) -> int:
         conn = self._require_conn()
+        sub = (
+            round(float(subtotal_before_discount), 2)
+            if subtotal_before_discount is not None
+            else round(float(total_amount) + float(discount_amount), 2)
+        )
+        disc = round(float(discount_amount), 2)
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO orders (user_id, status, currency_code, total_amount)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO orders (
+                  user_id, status, currency_code, total_amount,
+                  coupon_code, campaign_id, legacy_campaign_code,
+                  legacy_order_ref, subtotal_before_discount,
+                  discount_amount, order_lineage
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING order_id;
                 """,
-                (user_id, status, currency_code, total_amount),
+                (
+                    user_id,
+                    status,
+                    currency_code,
+                    total_amount,
+                    coupon_code,
+                    campaign_id,
+                    legacy_campaign_code,
+                    legacy_order_ref,
+                    sub,
+                    disc,
+                    order_lineage,
+                ),
             )
             order_id_row = cur.fetchone()
             if order_id_row is None:
@@ -137,12 +268,28 @@ class OltpWriter:
             )
         return order_id
 
-    def get_table_count(self, table: str) -> int:
+    def get_table_count(self, table: str) -> Optional[int]:
+        if table not in _ALLOWED_EXT_TABLES:
+            raise ValueError(f"unsupported table name for extension count: {table!r}")
         conn = self._require_conn()
         with conn.cursor() as cur:
-            cur.execute(f"SELECT COUNT(*) FROM {table};")
+            cur.execute(
+                """
+                SELECT EXISTS (
+                  SELECT 1 FROM information_schema.tables
+                  WHERE table_schema = 'public' AND table_name = %s
+                );
+                """,
+                (table,),
+            )
             row = cur.fetchone()
-            return int(row[0]) if row else 0
+            if row is None or row[0] is not True:
+                return None
+            cur.execute(
+                sql.SQL("SELECT COUNT(*) FROM {};").format(sql.Identifier(table))
+            )
+            cnt = cur.fetchone()
+            return int(cnt[0]) if cnt else 0
 
     def fetch_campaign_ids(self) -> List[int]:
         conn = self._require_conn()

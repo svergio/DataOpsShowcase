@@ -23,14 +23,14 @@
 
 | Область | В репозитории |
 |--------|---------------|
-| Данные | [generators/](generators/) эмулируют компанию в четыре sink ([docs/Generators.md](docs/Generators.md)); профиль по умолчанию — [configs/generators/company.generator.json](configs/generators/company.generator.json); запуск контейнера `docker compose --profile generators up -d data_generator` |
+| Данные | [generators/](generators/) эмулируют компанию в четыре sink ([docs/Generators.md](docs/Generators.md)); профиль по умолчанию — [configs/generators/company.generator.json](configs/generators/company.generator.json); запуск контейнера `docker compose --profile generators up -d data_generator` (из каталога `DataOpsShowcase/`, где лежит `docker-compose.yml`). При старте генератор может применить [DDL расширений OLTP](services/postgres/init/02b_oltp_marketing_hr_finance.sql), если `OLTP_EXTENSIONS_SQL` задан — см. [docs/SETUP.md](docs/SETUP.md) (старый Docker-том Postgres) |
 | Хранение и витрины | PostgreSQL (схемы dbt: staging, vault, marts) — см. [docs/diagrams/dwh-schemas.md](docs/diagrams/dwh-schemas.md) |
 | Обработка | [spark/](spark/) (jobs, `common/`), [dbt/](dbt/) |
 | Оркестрация | [pipelines/](pipelines/) — Airflow DAG, datasets |
 | ML | [ml/](ml/) — обучение, фичи, вывод, MLflow |
 | Сервисы | [services/](services/) — dbt-web, общий Python |
 | Конфигурация | [configs/](configs/), [infra/](infra/) (ingress, мониторинг) |
-| Качество и мониторинг (DQC) | [monitoring/quality/](monitoring/quality/), [docs/QUALITY_AND_MONITORING.md](docs/QUALITY_AND_MONITORING.md), `make smoke` |
+| Тесты и DQ; наблюдаемость | [docs/TESTING_AND_DATA_QUALITY.md](docs/TESTING_AND_DATA_QUALITY.md), [docs/OBSERVABILITY_AND_LOGGING.md](docs/OBSERVABILITY_AND_LOGGING.md), вход: [docs/QUALITY_AND_MONITORING.md](docs/QUALITY_AND_MONITORING.md), `make smoke` |
 | Документация | [docs/](docs/) — архитектура, API, дорожная карта, схемы |
 
 ---
@@ -72,15 +72,15 @@
 
 | URL (относительно ingress) | Что смотреть |
 |----------------------------|----------------|
-| `/dbt-web/` | Веб-UI: runs, модели, тесты, lineage (логин: см. [docs/WEB_UI_ACCESS.md](docs/WEB_UI_ACCESS.md)) |
+| `/dbt/` | Веб-UI: runs, модели, тесты, lineage (логин: см. [docs/WEB_UI_ACCESS.md](docs/WEB_UI_ACCESS.md)); старый путь `/dbt-web/` редиректится сюда |
 | `/airflow/` | Панель Airflow: DAG, ручной запуск, логи |
 | `/mlflow/` | MLflow: эксперименты и артефакты |
 | `/grafana/` | Grafana: дашборды (логин в `.env`) |
-| `/superset/` | Superset над OLAP (витрины `dwh_marts`; см. [docs/SUPERSET.md](docs/SUPERSET.md); либо порт `${SUPERSET_PORT}` напрямую) |
+| `/superset/` | Superset над OLAP (витрины `dwh_marts`; см. [docs/SUPERSET.md](docs/SUPERSET.md)) |
 | `/dbt-api/v1/health` | Проверка, что API dbt-web отвечает за ingress |
 
 **Логины и типичные поломки (404/502):** [docs/WEB_UI_ACCESS.md](docs/WEB_UI_ACCESS.md).  
-**Порты и переменные без nginx:** тот же файл и [docs/API.md](docs/API.md).
+**Прямые порты:** для веб-UIs не используются; объектный API MinIO — `localhost:${MINIO_PORT}`. Детали: [WEB_UI_ACCESS.md](docs/WEB_UI_ACCESS.md), [API.md](docs/API.md).
 
 ---
 
@@ -97,6 +97,9 @@
 | [docs/business/](docs/business/) | Тексты для нетехнических читателей |
 | [docs/diagrams/](docs/diagrams/) | Схемы DWH, OLTP, Kafka, MinIO, Data Vault |
 | [docs/SUPERSET.md](docs/SUPERSET.md) | Superset: Postgres meta + DWH OLAP, bootstrap дашбордов |
+| [docs/TESTING_AND_DATA_QUALITY.md](docs/TESTING_AND_DATA_QUALITY.md) | Pytest vs dbt tests, DQ, селекторы, `scripts/run_dqc.sh` |
+| [docs/OBSERVABILITY_AND_LOGGING.md](docs/OBSERVABILITY_AND_LOGGING.md) | Grafana/Prometheus под `infra/monitoring`, `meta.*`, логирование |
+| [docs/QUALITY_AND_MONITORING.md](docs/QUALITY_AND_MONITORING.md) | Короткий индекс + контракты ingress/meta |
 
 ---
 
