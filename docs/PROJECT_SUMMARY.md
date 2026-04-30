@@ -62,8 +62,9 @@
 | [README.md](../README.md) | Вход в репозиторий, быстрый старт |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Монорепо, интеграция сервисов |
 | [SETUP.md](SETUP.md) | Запуск и окружение |
-| [Roadmap.md](Roadmap.md) | 15 идей доработки (ETL/ML), приоритеты P0–P2 |
+| [Roadmap.md](Roadmap.md) | Направления доработки (ETL/ML, канал инвестору), приоритеты P0–P2 |
 | [business/README.md](business/README.md) | Материалы для бизнеса |
+| [business/platform_value.md](business/platform_value.md) | Бизнес-смысл Atlas, портала и мессенджера |
 
 ---
 

@@ -7,5 +7,6 @@
 | [overview.md](overview.md) | Что такое песочница, зачем, что эмулируется |
 | [use_cases.md](use_cases.md) | 10 прикладных бизнес-сценариев |
 | [value.md](value.md) | Ценность: идеи, моделирование, обучение, демо |
+| [platform_value.md](platform_value.md) | Бизнес-смысл Atlas, портала ingress и связь с каналом в мессенджере (инвестор / СД) |
 
 Техническое целостное описание: [../PROJECT_SUMMARY.md](../PROJECT_SUMMARY.md).
