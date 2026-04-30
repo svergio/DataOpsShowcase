@@ -1,5 +1,9 @@
 # OLTP: ER-диаграмма (PostgreSQL, Mermaid)
 
+## Границы
+
+**Транзакционная модель** в `postgres_oltp`, не веб-UI и не dbt. Контекст контейнера в стеке: [c4-container.md](c4-container.md).
+
 **Зачем:** быстро понять сущности маркетплейса TechMart в транзакционной БД.
 
 **Источник правды по DDL:** [02_oltp_schema.sql](../../services/postgres/init/02_oltp_schema.sql), [02b_oltp_marketing_hr_finance.sql](../../services/postgres/init/02b_oltp_marketing_hr_finance.sql), [02c_oltp_retail_legacy.sql](../../services/postgres/init/02c_oltp_retail_legacy.sql) (ретейл-линия: купоны, софт-кампании, легаси-ключи; контейнер `postgres_oltp` и авто-DDL генератора).
@@ -124,3 +128,8 @@ erDiagram
 - Заполнение справочников (`users`, `sellers`, `products`) — на старте генератора (seed).
 - Заказы и позиции — каждые `GENERATOR_TICK_SECONDS` секунд, объёмом
   `GENERATOR_ORDERS_PER_TICK_MIN..MAX`.
+
+## См. также
+
+- [c4-container.md](c4-container.md) — контейнер `postgres_oltp`
+- [dwh-schemas.md](dwh-schemas.md), [kafka-er.md](kafka-er.md)

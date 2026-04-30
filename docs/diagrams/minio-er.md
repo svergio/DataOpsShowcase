@@ -1,5 +1,9 @@
 # MinIO: структура объектов (Mermaid)
 
+## Границы
+
+**Префиксы и объекты** в bucket, не nginx/ingress. Доступ к S3 из контейнеров и с хоста: [c4-container.md](c4-container.md), [../WEB_UI_ACCESS.md](../WEB_UI_ACCESS.md).
+
 **Зачем:** понять, как **файловый сырой слой** устроен в bucket (S3-совместимый API), до того как Airflow/Spark заберут данные в БД.
 
 **Bucket** `MINIO_BUCKET_RAW` (часто `techmart-data`) и **префиксы** по умолчанию — в [configs/generators/company.generator.json](../../configs/generators/company.generator.json) и в [generators/common/config.py](../../generators/common/config.py); env (`MINIO_*`, `GENERATOR_MINIO_BATCH_TICKS`) может перекрыть профиль. Периодическая выгрузка зависит от `minio_batch_ticks` в JSON/env и от логики [generators/generator.py](../../generators/generator.py).
@@ -105,3 +109,8 @@ erDiagram
 - `product_id` ссылается на `products.product_id` (OLTP).
 - Файлы caталога — снимки изменений по части `products`.
 - Экспорты **marketing / SEO / HR / telemetry** (см. таблицу расширенных префиксов) обычно содержат `campaign_id`, `keyword_id`, `employee_id` — те же бизнес-ключи, что в OLTP после [`02b`](../../services/postgres/init/02b_oltp_marketing_hr_finance.sql) / [`02c`](../../services/postgres/init/02c_oltp_retail_legacy.sql); при «легаси»-источнике часть полей может быть только строковой — тогда сверка в DWH идёт по правилам согласования, а не по строгому FK.
+
+## См. также
+
+- [c4-container.md](c4-container.md) — сервис `minio` и доступ S3 / консоли
+- [kafka-er.md](kafka-er.md), [oltp-er.md](oltp-er.md)

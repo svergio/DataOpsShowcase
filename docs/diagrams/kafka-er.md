@@ -1,5 +1,9 @@
 # Kafka: топики и сущности (Mermaid)
 
+## Границы
+
+Логика **топиков и сущностей**, не маршруты ingress. REST Schema Registry и CDC — опциональный overlay; карта контейнеров: [c4-container.md](c4-container.md), [../ARCHITECTURE_CDC.md](../ARCHITECTURE_CDC.md).
+
 **Зачем:** увидеть, какие **потоки событий** питают ingestion, и как сущности связаны на уровне **логики** (не низкоуровневого протокола).
 
 **Генератор** пишет в топики; имена по умолчанию заданы в [configs/generators/company.generator.json](../../configs/generators/company.generator.json) и подхватываются в [generators/common/config.py](../../generators/common/config.py). Переменные окружения (`KAFKA_TOPIC_*`, `KAFKA_BOOTSTRAP_SERVERS`) перекрывают JSON при необходимости.
@@ -135,3 +139,8 @@ erDiagram
 | `techmart.seo.organic_sessions` | Органические сессии по поиску (JSON) |
 | `techmart.hr.time_tracking` | Учёт времени (clock in/out) |
 | `techmart.features.evaluated` | Оценка feature flags по пользователю |
+
+## См. также
+
+- [c4-container.md](c4-container.md) — брокер `kafka` и опциональный CDC
+- [oltp-er.md](oltp-er.md), [dwh-schemas.md](dwh-schemas.md)

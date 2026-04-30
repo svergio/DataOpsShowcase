@@ -2,7 +2,7 @@
 
 > **Песочница полного контура Data Platform** в одном монорепозитории: от синтетических источников до витрин, MLflow и дашбордов.
 
-**DataOpsShowcase** эмулирует цепочку, похожую на продуктовую: **OLTP, Kafka, MinIO** → ingestion и **Apache Airflow** → **Apache Spark** → **dbt** (включая **Data Vault 2.0**), витрины, **ML** (Spark + **MLflow**), наблюдаемость (**Prometheus / Grafana**). Сверху — **dbt-web** (Flask): запуски, тесты, lineage, ссылки на артефакты dbt.
+**DataOpsShowcase** эмулирует цепочку, похожую на продуктовую: **OLTP, Kafka, MinIO** → ingestion и **Apache Airflow** → **Apache Spark** → **dbt** (включая **Data Vault 2.0**), витрины, **ML** (Spark + **MLflow**), наблюдаемость (**Prometheus / Grafana**). Сверху — единый **ingress** с порталом `/` (карточки сервисов, live-статусы, граф), **dbt-web** (Flask UI/API) и внутренним **dbt-rest** (FastAPI для запусков dbt).
 
 Это **учебно-демонстрационный** стенд: можно безопасно экспериментировать, показывать архитектуру **инженерам, аналитикам и бизнесу** ([docs/business/](docs/business/)) — без претензии на промышленную безопасность и масштаб.
 
@@ -28,7 +28,7 @@
 | Обработка | [spark/](spark/) (jobs, `common/`), [dbt/](dbt/) |
 | Оркестрация | [pipelines/](pipelines/) — Airflow DAG, datasets |
 | ML | [ml/](ml/) — обучение, фичи, вывод, MLflow |
-| Сервисы | [services/](services/) — dbt-web, общий Python |
+| Сервисы | [services/](services/) — portal_web, dbt-web, dbt-rest, общий Python |
 | Конфигурация | [configs/](configs/), [infra/](infra/) (ingress, мониторинг) |
 | Тесты и DQ; наблюдаемость | [docs/TESTING_AND_DATA_QUALITY.md](docs/TESTING_AND_DATA_QUALITY.md), [docs/OBSERVABILITY_AND_LOGGING.md](docs/OBSERVABILITY_AND_LOGGING.md), вход: [docs/QUALITY_AND_MONITORING.md](docs/QUALITY_AND_MONITORING.md), `make smoke` |
 | Документация | [docs/](docs/) — архитектура, API, дорожная карта, схемы |
@@ -72,6 +72,7 @@
 
 | URL (относительно ingress) | Что смотреть |
 |----------------------------|----------------|
+| `/` | Портал стека: быстрые ссылки, статусы контейнеров, карта зависимостей (конфиг в `services/portal_web/data/catalog.json`) |
 | `/dbt/` | Веб-UI: runs, модели, тесты, lineage (логин: см. [docs/WEB_UI_ACCESS.md](docs/WEB_UI_ACCESS.md)); старый путь `/dbt-web/` редиректится сюда |
 | `/airflow/` | Панель Airflow: DAG, ручной запуск, логи |
 | `/mlflow/` | MLflow: эксперименты и артефакты |
@@ -80,7 +81,8 @@
 | `/dbt-api/v1/health` | Проверка, что API dbt-web отвечает за ingress |
 
 **Логины и типичные поломки (404/502):** [docs/WEB_UI_ACCESS.md](docs/WEB_UI_ACCESS.md).  
-**Прямые порты:** для веб-UIs не используются; объектный API MinIO — `localhost:${MINIO_PORT}`. Детали: [WEB_UI_ACCESS.md](docs/WEB_UI_ACCESS.md), [API.md](docs/API.md).
+**Прямые порты:** для веб-UIs не используются; объектный API MinIO — `localhost:${MINIO_PORT}`.  
+**API и внутренние адреса (`service:port`), включая dbt-rest:** [docs/API.md](docs/API.md).
 
 ---
 
@@ -94,8 +96,10 @@
 | [docs/PIPELINES.md](docs/PIPELINES.md) | DAG и цепочка datasets |
 | [docs/Roadmap.md](docs/Roadmap.md) | Дорожная карта: ETL/ML, приоритеты |
 | [docs/Generators.md](docs/Generators.md) | Синтетика и источники |
+| [services/portal_web/README.md](services/portal_web/README.md) | Конфиг портала, формат `catalog.json`, валидация |
 | [docs/business/](docs/business/) | Тексты для нетехнических читателей |
-| [docs/diagrams/](docs/diagrams/) | Схемы DWH, OLTP, Kafka, MinIO, Data Vault |
+| [docs/business/platform_value.md](docs/business/platform_value.md) | Бизнес-смысл портала/каталога и канал инвестору |
+| [docs/diagrams/](docs/diagrams/) | C4 контейнеров, схемы DWH, OLTP, Kafka, MinIO, Data Vault |
 | [docs/SUPERSET.md](docs/SUPERSET.md) | Superset: Postgres meta + DWH OLAP, bootstrap дашбордов |
 | [docs/TESTING_AND_DATA_QUALITY.md](docs/TESTING_AND_DATA_QUALITY.md) | Pytest vs dbt tests, DQ, селекторы, `scripts/run_dqc.sh` |
 | [docs/OBSERVABILITY_AND_LOGGING.md](docs/OBSERVABILITY_AND_LOGGING.md) | Grafana/Prometheus под `infra/monitoring`, `meta.*`, логирование |

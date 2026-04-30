@@ -1,5 +1,9 @@
 # Аналитическое хранилище (DWH): схемы PostgreSQL
 
+## Границы
+
+Только **схемы PostgreSQL OLAP** и слой `meta`. Кто пишет в DWH из оркестрации и как ходить по HTTP: [c4-container.md](c4-container.md), [../PIPELINES.md](../PIPELINES.md).
+
 **Назначение:** показать, **в каких схемах** лежат слои витрины и метаданных в текущем репозитории. Согласовано с [dbt/dbt_project.yml](../../dbt/dbt_project.yml) и init SQL: [04_dwh_extensions.sql](../../services/postgres/init/04_dwh_extensions.sql), [06_dwh_raw_generators_extensions.sql](../../services/postgres/init/06_dwh_raw_generators_extensions.sql), [dbt/macros/utils/ensure_dwh_schemas.sql](../../dbt/macros/utils/ensure_dwh_schemas.sql).
 
 **Слой raw (OLAP):** помимо базовых `raw.oltp_*` / `raw.kafka_*`, расширения генератора (маркетинг, SEO, HR, GL, Kafka extension-топики) лежат в таблицах из `06_dwh_raw_generators_extensions.sql`. Канон бизнес-ключей для dbt-моделей: [../DV2_ENTITY_KEYS.md](../DV2_ENTITY_KEYS.md).
@@ -69,6 +73,7 @@ flowchart LR
 
 ## См. также
 
+- [c4-container.md](c4-container.md) — контейнеры и ingress
 - [../SUPERSET.md](../SUPERSET.md) — Superset к `dwh_marts`: подключения (metadb / OLAP), bootstrap, дашборды
 - [../ARCHITECTURE.md](../ARCHITECTURE.md) — монорепо
 - [../PROJECT_SUMMARY.md](../PROJECT_SUMMARY.md) — обзор стенда

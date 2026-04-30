@@ -1,5 +1,9 @@
 # Поток данных: от сырья к витринам (dbt / Data Vault)
 
+## Границы
+
+Описание **слоя данных и dbt** (без контейнеров и ingress). Платформа в Docker: [c4-container.md](c4-container.md).
+
 Схема отражает **логические слои** проекта [dbt/dbt_project.yml](../../dbt/dbt_project.yml): `staging` (views) → **raw Data Vault** (hubs, links, satellites) → **business Data Vault** (PIT, bridge, business satellites) → **marts** → **serving**.
 
 **Имена схем в PostgreSQL (DWH):** [dwh-schemas.md](dwh-schemas.md). Реальная оркестрация (Airflow DAG, SCD2, порядок job) — [../PIPELINES.md](../PIPELINES.md).
@@ -69,6 +73,7 @@ flowchart TB
 
 ## См. также
 
+- [c4-container.md](c4-container.md) — контейнеры и ingress (runtime)
 - [../SUPERSET.md](../SUPERSET.md) — дашборды по витринам `dwh_marts`
 - [oltp-er.md](oltp-er.md), [kafka-er.md](kafka-er.md), [minio-er.md](minio-er.md) — что приходит **до** dbt
 - [../ARCHITECTURE.md](../ARCHITECTURE.md) — монорепо

@@ -27,7 +27,7 @@
 
 Публикация HTTP наружу идёт через **единый nginx ingress**: большинство ссылок в портале — полноценные веб-интерфейсы; префиксы **`/schema-registry/`** и **`/kafka-connect/`** — это **REST/API** (ответы JSON), и они живы только при CDC-overlay ([ARCHITECTURE_CDC.md](ARCHITECTURE_CDC.md)).
 
-Схемы: **схемы PostgreSQL (DWH)** — [diagrams/dwh-schemas.md](diagrams/dwh-schemas.md); **поток Data Vault** — [diagrams/data_vault_flow.md](diagrams/data_vault_flow.md).
+Схемы: **контейнеры Docker (C4)** — [diagrams/c4-container.md](diagrams/c4-container.md); **схемы PostgreSQL (DWH)** — [diagrams/dwh-schemas.md](diagrams/dwh-schemas.md); **поток Data Vault** — [diagrams/data_vault_flow.md](diagrams/data_vault_flow.md).
 
 ## Как данные проходят через систему (упрощённо)
 
