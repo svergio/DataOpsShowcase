@@ -16,7 +16,7 @@ http://localhost:${INGRESS_PORT}
 
 | Путь | Сервис |
 |------|--------|
-| `/` | Портал стека (Flask `portal_web`: ссылки и live-статусы контейнеров) |
+| `/` | Портал стека (Flask `portal_web`: ссылки и live-статусы контейнеров). Карточки и граф настраиваются в [`services/portal_web/data/catalog.json`](../services/portal_web/data/catalog.json) (см. [`services/portal_web/README.md`](../services/portal_web/README.md)). |
 | `/dbt/` | dbt-web (Flask UI) |
 | `/dbt-web/…` | Постоянный редирект 301 на `/dbt/…` (совместимость закладок) |
 | `/api/`, `/dbt-api/` | тот же backend dbt-web |
@@ -80,6 +80,7 @@ http://localhost:8090/atlas/
 | Симптом | Что проверить |
 |---------|----------------|
 | **404** | Совпадает ли путь с `nginx.conf` |
+| **502 на `/` после пересоздания `portal_web`** | Nginx мог кратко держать старый IP контейнера в DNS-кэше: подождать **до ~5 с** или выполнить `docker compose restart ingress`. При длительном 502 проверить логи `portal_web` и `dataops_ingress`. |
 | **502 на /atlas/ или CDC** | Поднят ли overlay с `atlas_server` / `schema_registry` / `debezium_connect` на `dataops_net` |
 | **Прямое подключение к старым портам** | Порты веб-сервисов закрыты; используйте `INGRESS_PORT` или `MINIO_PORT` только для S3 |
 

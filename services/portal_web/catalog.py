@@ -1,259 +1,133 @@
 from __future__ import annotations
 
-INIT_CONTAINERS = frozenset({"airflow_init", "superset_init"})
+import json
+import logging
+import os
+from pathlib import Path
+from typing import Any
 
-OPTIONAL_GRAPH_CONTAINERS = frozenset(
-    {"atlas_server", "schema_registry", "debezium_connect", "data_generator"}
-)
+logger = logging.getLogger(__name__)
 
-WEB_UI_SERVICES: list[dict[str, str | None]] = [
-    {
-        "id": "airflow",
-        "name": "Airflow",
-        "route": "/airflow/",
-        "purpose": "Веб-интерфейс DAG, расписание по датасетам, логи задач (см. docs/PIPELINES.md).",
-        "container": "airflow_webserver",
-        "probe_url": "http://airflow_webserver:8080/health",
-    },
-    {
-        "id": "dbt-ui",
-        "name": "dbt Web (UI)",
-        "route": "/dbt/",
-        "purpose": "Оболочка над артефактами dbt: прогоны, тесты, lineage, документация (docs/WEB_UI_ACCESS.md).",
-        "container": "dbt-web-backend",
-        "probe_url": "http://dbt-web-backend:8010/api/v1/health",
-    },
-    {
-        "id": "mlflow",
-        "name": "MLflow",
-        "route": "/mlflow/",
-        "purpose": "Эксперименты и артефакты ML; связка со Spark-тренировками в каталоге DAG.",
-        "container": "mlflow",
-        "probe_url": "http://mlflow:5000/",
-    },
-    {
-        "id": "grafana",
-        "name": "Grafana",
-        "route": "/grafana/",
-        "purpose": "Дашборды по метрикам Prometheus и сигналам пайплайнов.",
-        "container": "grafana",
-        "probe_url": "http://grafana:3000/api/health",
-    },
-    {
-        "id": "superset",
-        "name": "Superset",
-        "route": "/superset/",
-        "purpose": "BI и SQL над витринами OLAP (см. docs/SUPERSET.md).",
-        "container": "superset",
-        "probe_url": "http://superset:8088/health",
-    },
-    {
-        "id": "jupyter",
-        "name": "Jupyter",
-        "route": "/jupyter/",
-        "purpose": "Ноутбуки в сети стека; base_url=/jupyter/ (docs/WEB_UI_ACCESS.md).",
-        "container": "jupyterhub",
-        "probe_url": "http://jupyterhub:8888/jupyter/",
-    },
-    {
-        "id": "prometheus",
-        "name": "Prometheus",
-        "route": "/prometheus/",
-        "purpose": "Сбор и запрос метрик; UI за ingress с префиксом /prometheus/.",
-        "container": "prometheus",
-        "probe_url": "http://prometheus:9090/-/healthy",
-    },
-    {
-        "id": "pushgateway",
-        "name": "Pushgateway",
-        "route": "/pushgateway/",
-        "purpose": "Приём push-метрик от короткоживущих задач (Spark и др.).",
-        "container": "pushgateway",
-        "probe_url": "http://pushgateway:9091/-/healthy",
-    },
-    {
-        "id": "spark-master",
-        "name": "Spark Master",
-        "route": "/spark-master/",
-        "purpose": "Веб UI мастера Spark standalone.",
-        "container": "spark_master",
-        "probe_url": "http://spark_master:8080/",
-    },
-    {
-        "id": "spark-worker",
-        "name": "Spark Worker",
-        "route": "/spark-worker/",
-        "purpose": "Веб UI воркера: executors и задачи.",
-        "container": "spark_worker",
-        "probe_url": "http://spark_worker:8081/",
-    },
-    {
-        "id": "minio-console",
-        "name": "MinIO Console",
-        "route": "/minio-console/",
-        "purpose": "Консоль объектного хранилища (сырые зоны, артефакты). S3 API с хоста — отдельный порт MINIO_PORT.",
-        "container": "minio",
-        "probe_url": "http://minio:9001/",
-    },
-    {
-        "id": "atlas",
-        "name": "Apache Atlas",
-        "route": "/atlas/",
-        "purpose": "Метаданные и lineage: веб-UI и API (опциональный overlay infra/metadata/atlas).",
-        "container": "atlas_server",
-        "probe_url": "http://atlas_server:21000/",
-    },
-]
+_CATALOG_PATH_ENV = "PORTAL_CATALOG_PATH"
 
-API_AND_TOOLS: list[dict[str, str | None]] = [
-    {
-        "id": "schema-registry",
-        "name": "Schema Registry (REST)",
-        "route": "/schema-registry/",
-        "purpose": "Confluent-compatible API схем: JSON с хоста, не отдельный веб-UI (overlay infra/cdc).",
-        "container": "schema_registry",
-        "probe_url": "http://schema_registry:8081/subjects",
-        "kind": "ingress_api",
-    },
-    {
-        "id": "kafka-connect",
-        "name": "Kafka Connect / Debezium (REST)",
-        "route": "/kafka-connect/",
-        "purpose": "REST Kafka Connect (версия кластера, коннекторы); ответы JSON (overlay).",
-        "container": "debezium_connect",
-        "probe_url": "http://debezium_connect:8083/connectors",
-        "kind": "ingress_api",
-    },
-    {
-        "id": "dbt-api-ingress",
-        "name": "dbt-web JSON API (через ingress)",
-        "route": "/dbt-api/v1/",
-        "purpose": "Тот же процесс, что и UI: REST для прогонов, моделей, lineage. "
-        "Основные вызовы — из Airflow/webhooks и скриптов внутри Docker; с хоста удобно только для отладки.",
-        "container": "dbt-web-backend",
-        "probe_url": "http://dbt-web-backend:8010/api/v1/health",
-        "kind": "ingress_api",
-    },
-    {
-        "id": "dbt-api-raw",
-        "name": "dbt-web API (прямой контейнер)",
-        "route": "",
-        "purpose": "Внутри сети compose: http://dbt-web-backend:8010/api/v1/ — без публикации порта на хост (docs/API.md).",
-        "container": "dbt-web-backend",
-        "probe_url": "http://dbt-web-backend:8010/api/v1/health",
-        "kind": "internal_only",
-    },
-    {
-        "id": "nginx-api-prefix",
-        "name": "Префикс /api/ у ingress",
-        "route": "/api/",
-        "purpose": "Проксирование на тот же backend dbt-web. Для автоматизации предпочтительны вызовы по docker network.",
-        "container": "dbt-web-backend",
-        "probe_url": "http://dbt-web-backend:8010/api/v1/health",
-        "kind": "ingress_api",
-    },
-    {
-        "id": "dbt-rest",
-        "name": "dbt REST (внешний раннер)",
-        "route": "",
-        "purpose": "Единый HTTP-раннер dbt: Airflow — POST /runs; dbt-web — POST /jobs/run/{staging|vault|marts}, статус, логи, артефакты (manifest/catalog/run_results). См. services/dbt_rest и API.md.",
-        "container": "dbt-rest",
-        "probe_url": "http://dbt-rest:8580/health",
-        "kind": "internal_only",
-    },
-    {
-        "id": "pg-oltp",
-        "name": "PostgreSQL OLTP",
-        "route": "",
-        "purpose": "Хост postgres_oltp:5432 в compose; подключения из генераторов, CDC и приложений внутри сети.",
-        "container": "postgres_oltp",
-        "probe_url": None,
-        "kind": "internal_only",
-    },
-    {
-        "id": "pg-olap",
-        "name": "PostgreSQL OLAP (DWH)",
-        "route": "",
-        "purpose": "Хост postgres_olap:5432 — raw/staging/vault/marts; dbt и Airflow ходят сюда из контейнеров.",
-        "container": "postgres_olap",
-        "probe_url": None,
-        "kind": "internal_only",
-    },
-    {
-        "id": "kafka-internal",
-        "name": "Kafka broker",
-        "route": "",
-        "purpose": "kafka:9092 — потоки ingestion и Spark/Airflow; доступ с хоста только если проброшен KAFKA_PORT в .env.",
-        "container": "kafka",
-        "probe_url": None,
-        "kind": "internal_only",
-    },
-    {
-        "id": "minio-s3",
-        "name": "MinIO S3 API",
-        "route": "",
-        "purpose": "minio:9000 внутри сети; с хоста — localhost:MINIO_PORT (docs/WEB_UI_ACCESS.md).",
-        "container": "minio",
-        "probe_url": None,
-        "kind": "internal_only",
-    },
-]
 
-GRAPH_NODES: list[dict[str, object]] = [
-    {"id": "dataops_ingress", "label_ru": "Ingress (nginx)", "container": "dataops_ingress", "shape_kind": "gateway", "group": 0, "is_init": False},
-    {"id": "portal_web", "label_ru": "Портал", "container": "portal_web", "shape_kind": "web_app", "group": 0, "is_init": False},
-    {"id": "airflow_webserver", "label_ru": "Airflow Web", "container": "airflow_webserver", "shape_kind": "orchestrator", "group": 1, "is_init": False},
-    {"id": "airflow_scheduler", "label_ru": "Airflow Scheduler", "container": "airflow_scheduler", "shape_kind": "orchestrator", "group": 1, "is_init": False},
-    {"id": "airflow_triggerer", "label_ru": "Airflow Triggerer", "container": "airflow_triggerer", "shape_kind": "orchestrator", "group": 1, "is_init": False},
-    {"id": "airflow_init", "label_ru": "Airflow init", "container": "airflow_init", "shape_kind": "batch", "group": 1, "is_init": True},
-    {"id": "spark_master", "label_ru": "Spark Master", "container": "spark_master", "shape_kind": "compute", "group": 2, "is_init": False},
-    {"id": "spark_worker", "label_ru": "Spark Worker", "container": "spark_worker", "shape_kind": "compute", "group": 2, "is_init": False},
-    {"id": "dbt", "label_ru": "dbt (CLI)", "container": "dbt", "shape_kind": "batch", "group": 2, "is_init": False},
-    {"id": "dbt-web-backend", "label_ru": "dbt Web/API", "container": "dbt-web-backend", "shape_kind": "web_app", "group": 2, "is_init": False},
-    {"id": "dbt_rest", "label_ru": "dbt REST", "container": "dbt-rest", "shape_kind": "batch", "group": 2, "is_init": False},
-    {"id": "postgres_oltp", "label_ru": "PostgreSQL OLTP", "container": "postgres_oltp", "shape_kind": "db", "group": 3, "is_init": False},
-    {"id": "postgres_olap", "label_ru": "PostgreSQL OLAP", "container": "postgres_olap", "shape_kind": "db", "group": 3, "is_init": False},
-    {"id": "postgres_metadb", "label_ru": "PostgreSQL Meta", "container": "postgres_metadb", "shape_kind": "db", "group": 3, "is_init": False},
-    {"id": "redis", "label_ru": "Redis", "container": "redis", "shape_kind": "cache", "group": 3, "is_init": False},
-    {"id": "kafka", "label_ru": "Kafka", "container": "kafka", "shape_kind": "broker", "group": 3, "is_init": False},
-    {"id": "minio", "label_ru": "MinIO", "container": "minio", "shape_kind": "object_store", "group": 3, "is_init": False},
-    {"id": "mlflow", "label_ru": "MLflow", "container": "mlflow", "shape_kind": "observability", "group": 4, "is_init": False},
-    {"id": "grafana", "label_ru": "Grafana", "container": "grafana", "shape_kind": "observability", "group": 4, "is_init": False},
-    {"id": "prometheus", "label_ru": "Prometheus", "container": "prometheus", "shape_kind": "observability", "group": 4, "is_init": False},
-    {"id": "pushgateway", "label_ru": "Pushgateway", "container": "pushgateway", "shape_kind": "observability", "group": 4, "is_init": False},
-    {"id": "superset", "label_ru": "Superset", "container": "superset", "shape_kind": "web_app", "group": 4, "is_init": False},
-    {"id": "superset_init", "label_ru": "Superset init", "container": "superset_init", "shape_kind": "batch", "group": 4, "is_init": True},
-    {"id": "jupyterhub", "label_ru": "Jupyter", "container": "jupyterhub", "shape_kind": "web_app", "group": 4, "is_init": False},
-    {"id": "atlas_server", "label_ru": "Atlas (opt.)", "container": "atlas_server", "shape_kind": "web_app", "group": 5, "is_init": False, "optional": True},
-    {"id": "schema_registry", "label_ru": "Schema Reg. (opt.)", "container": "schema_registry", "shape_kind": "broker", "group": 5, "is_init": False, "optional": True},
-    {"id": "debezium_connect", "label_ru": "Debezium (opt.)", "container": "debezium_connect", "shape_kind": "compute", "group": 5, "is_init": False, "optional": True},
-    {"id": "data_generator", "label_ru": "Генератор (opt.)", "container": "data_generator", "shape_kind": "batch", "group": 5, "is_init": False, "optional": True},
-]
+def _default_catalog_path() -> Path:
+    return Path(__file__).resolve().parent / "data" / "catalog.json"
 
-GRAPH_LINKS: list[tuple[str, str]] = [
-    ("dataops_ingress", "portal_web"),
-    ("dataops_ingress", "airflow_webserver"),
-    ("airflow_webserver", "airflow_scheduler"),
-    ("airflow_webserver", "airflow_triggerer"),
-    ("airflow_webserver", "spark_master"),
-    ("spark_master", "spark_worker"),
-    ("airflow_webserver", "dbt_rest"),
-    ("airflow_webserver", "dbt"),
-    ("dbt-web-backend", "dbt_rest"),
-    ("airflow_webserver", "kafka"),
-    ("airflow_webserver", "postgres_oltp"),
-    ("dbt", "postgres_olap"),
-    ("dbt-web-backend", "postgres_olap"),
-    ("dbt", "minio"),
-    ("dbt-web-backend", "minio"),
-    ("superset", "postgres_olap"),
-    ("grafana", "prometheus"),
-    ("prometheus", "pushgateway"),
-    ("mlflow", "minio"),
-    ("kafka", "schema_registry"),
-    ("debezium_connect", "kafka"),
-    ("debezium_connect", "schema_registry"),
-]
+
+def _normalize_service_entry(raw: dict[str, Any]) -> dict[str, str | None]:
+    out: dict[str, str | None] = {
+        "id": str(raw["id"]),
+        "name": str(raw["name"]),
+        "route": str(raw.get("route") or ""),
+        "purpose": str(raw["purpose"]),
+        "container": str(raw.get("container") or ""),
+    }
+    if raw.get("probe_url") is not None:
+        out["probe_url"] = str(raw["probe_url"])
+    else:
+        out["probe_url"] = None
+    if "kind" in raw and raw["kind"] is not None:
+        out["kind"] = str(raw["kind"])
+    if "checklist_what" in raw and raw["checklist_what"] is not None:
+        out["checklist_what"] = str(raw["checklist_what"])
+    if "checklist_how" in raw and raw["checklist_how"] is not None:
+        out["checklist_how"] = str(raw["checklist_how"])
+    return out
+
+
+def _normalize_graph_nodes(raw: list[dict[str, Any]]) -> list[dict[str, object]]:
+    out: list[dict[str, object]] = []
+    for n in raw:
+        item: dict[str, object] = {
+            "id": str(n["id"]),
+            "label_ru": str(n["label_ru"]),
+            "container": str(n["container"]),
+            "shape_kind": str(n["shape_kind"]),
+            "group": int(n.get("group", 0)),
+            "is_init": bool(n.get("is_init", False)),
+        }
+        if "optional" in n:
+            item["optional"] = bool(n["optional"])
+        out.append(item)
+    return out
+
+
+def validate_catalog(data: dict[str, Any]) -> None:
+    v = int(data.get("version", 0))
+    if v < 1:
+        raise ValueError("catalog: missing or invalid version")
+
+    for key in ("init_containers", "optional_graph_containers", "web_ui_services", "api_and_tools", "graph_nodes", "graph_links"):
+        if key not in data:
+            raise ValueError(f"catalog: missing key {key!r}")
+
+    web = data["web_ui_services"]
+    api = data["api_and_tools"]
+    nodes = data["graph_nodes"]
+    links = data["graph_links"]
+
+    ids_web = [str(x["id"]) for x in web]
+    ids_api = [str(x["id"]) for x in api]
+    if len(ids_web) != len(set(ids_web)):
+        raise ValueError("catalog: duplicate id in web_ui_services")
+    if len(ids_api) != len(set(ids_api)):
+        raise ValueError("catalog: duplicate id in api_and_tools")
+
+    node_ids = {str(n["id"]) for n in nodes}
+    if len(node_ids) != len(nodes):
+        raise ValueError("catalog: duplicate id in graph_nodes")
+
+    for i, link in enumerate(links):
+        if not isinstance(link, (list, tuple)) or len(link) != 2:
+            raise ValueError(f"catalog: graph_links[{i}] must be [source, target]")
+        a, b = str(link[0]), str(link[1])
+        if a not in node_ids:
+            raise ValueError(f"catalog: graph_links unknown source {a!r}")
+        if b not in node_ids:
+            raise ValueError(f"catalog: graph_links unknown target {b!r}")
+
+
+def load_catalog_dict(path: Path | None = None) -> dict[str, Any]:
+    raw = (os.environ.get(_CATALOG_PATH_ENV) or "").strip()
+    p = Path(path) if path is not None else (Path(raw) if raw else _default_catalog_path())
+    p = Path(p)
+    if not p.is_file():
+        raise FileNotFoundError(f"portal catalog not found: {p}")
+    text = p.read_text(encoding="utf-8")
+    data = json.loads(text)
+    if not isinstance(data, dict):
+        raise ValueError("catalog: root must be an object")
+    validate_catalog(data)
+    return data
+
+
+def _build_from_disk(path: Path | None = None) -> tuple[
+    frozenset[str],
+    frozenset[str],
+    list[dict[str, str | None]],
+    list[dict[str, str | None]],
+    list[dict[str, object]],
+    list[tuple[str, str]],
+]:
+    data = load_catalog_dict(path)
+    init_c = frozenset(str(x) for x in data["init_containers"])
+    opt_c = frozenset(str(x) for x in data["optional_graph_containers"])
+    web = [_normalize_service_entry(x) for x in data["web_ui_services"]]
+    api = [_normalize_service_entry(x) for x in data["api_and_tools"]]
+    gn = _normalize_graph_nodes(data["graph_nodes"])
+    gl = [(str(pair[0]), str(pair[1])) for pair in data["graph_links"]]
+    return init_c, opt_c, web, api, gn, gl
+
+
+_INIT_C, _OPT_C, _WEB, _API, _GNODES, _GLINKS = _build_from_disk()
+
+INIT_CONTAINERS: frozenset[str] = _INIT_C
+OPTIONAL_GRAPH_CONTAINERS: frozenset[str] = _OPT_C
+WEB_UI_SERVICES: list[dict[str, str | None]] = _WEB
+API_AND_TOOLS: list[dict[str, str | None]] = _API
+GRAPH_NODES: list[dict[str, object]] = _GNODES
+GRAPH_LINKS: list[tuple[str, str]] = _GLINKS
 
 SERVICE_ENTRIES = WEB_UI_SERVICES
 C4_NODES: list[dict[str, object]] = []

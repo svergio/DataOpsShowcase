@@ -427,11 +427,13 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8580/health')\""]
       interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+      timeout: 10s
+      retries: 8
+      start_period: 90s
     networks:
-      - dataops_net
+      dataops_net:
+        aliases:
+          - dbt-rest
 
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.15.1

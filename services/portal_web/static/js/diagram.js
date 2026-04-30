@@ -541,6 +541,26 @@
   function renderCards(root, services, isApi) {
     if (!root) return;
     root.innerHTML = "";
+
+    function hostPortFromUrl(rawUrl) {
+      if (!rawUrl) return "";
+      try {
+        const u = new URL(rawUrl);
+        return u.host || "";
+      } catch {
+        return "";
+      }
+    }
+
+    function buildApiAccessLine(s, route) {
+      const hp = hostPortFromUrl(s.probe_url || "");
+      if (route && hp) return "Как ходить: с хоста " + route + " / внутри " + hp;
+      if (route) return "Как ходить: с хоста " + route;
+      if (hp) return "Как ходить: внутри " + hp;
+      if (s.container) return "Как ходить: внутри контейнера " + s.container;
+      return "Как ходить: см. docs/API.md";
+    }
+
     for (const s of services) {
       const route = (s.route || "").trim();
       const useLink = Boolean(route);
@@ -563,10 +583,22 @@
       path.textContent = route || (isApi ? "внутри Docker / см. описание" : "");
       main.appendChild(path);
 
-      const p = document.createElement("p");
-      p.className = "card-purpose";
-      p.textContent = s.purpose;
-      main.appendChild(p);
+      if (isApi) {
+        const p1 = document.createElement("p");
+        p1.className = "card-purpose card-purpose-check";
+        p1.textContent = "Что это: " + (s.checklist_what || s.purpose || "");
+        main.appendChild(p1);
+
+        const p2 = document.createElement("p");
+        p2.className = "card-purpose card-purpose-check";
+        p2.textContent = "Как ходить: " + (s.checklist_how || buildApiAccessLine(s, route).replace(/^Как ходить:\s*/, ""));
+        main.appendChild(p2);
+      } else {
+        const p = document.createElement("p");
+        p.className = "card-purpose";
+        p.textContent = s.purpose;
+        main.appendChild(p);
+      }
 
       const aside = document.createElement("aside");
       aside.className = "card-aside";

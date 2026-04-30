@@ -500,6 +500,15 @@ body {
   color: var(--text-muted);
 }
 
+.card-purpose-check {
+  margin: 0 0 4px;
+  line-height: 1.35;
+}
+
+.card-purpose-check:last-child {
+  margin-bottom: 0;
+}
+
 .card-aside {
   width: 44px;
   background: var(--bg-panel);

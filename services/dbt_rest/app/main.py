@@ -66,7 +66,10 @@ def _with_run_target_path(argv: list[str], run_id: str) -> list[str]:
     rel = f"target/runs/{run_id}"
     if not argv or argv[0] != "dbt":
         raise ValueError("argv must start with dbt")
-    return ["dbt", "--target-path", rel, *argv[1:]]
+    if len(argv) < 2:
+        raise ValueError("argv must include dbt subcommand")
+    # In dbt 1.8+, --target-path is a subcommand option, not a global flag before COMMAND.
+    return ["dbt", argv[1], "--target-path", rel, *argv[2:]]
 
 
 def _argv_from_airflow_body(body: dict[str, Any]) -> list[str]:
@@ -228,6 +231,11 @@ def _run_view(run_id: str) -> dict[str, Any]:
         "job_name": data.get("job_name"),
         "artifacts": list(data.get("artifacts") or []),
     }
+
+
+@app.get("/health/live")
+def health_live() -> dict[str, str]:
+    return {"status": "ok"}
 
 
 @app.get("/health")

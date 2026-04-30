@@ -16,12 +16,20 @@ DSN = (os.environ.get("DBT_REST_DB_DSN") or "").strip()
 LOG_MAX_CHARS = int(os.environ.get("DBT_REST_LOG_MAX_CHARS", "1000000"))
 FINISH_RETRIES = max(1, int(os.environ.get("DBT_REST_FINISH_RETRIES", "5")))
 FINISH_RETRY_BASE_SEC = float(os.environ.get("DBT_REST_FINISH_RETRY_DELAY_SEC", "0.5"))
+CONNECT_TIMEOUT_SEC = int(os.environ.get("DBT_REST_PG_CONNECT_TIMEOUT", "10"))
+
+
+def _dsn_with_timeout(dsn: str) -> str:
+    if not dsn or "connect_timeout" in dsn.lower():
+        return dsn
+    sep = "&" if "?" in dsn else "?"
+    return f"{dsn}{sep}connect_timeout={CONNECT_TIMEOUT_SEC}"
 
 
 def _connect() -> psycopg.Connection:
     if not DSN:
         raise RuntimeError("DBT_REST_DB_DSN is not set")
-    return psycopg.connect(DSN, autocommit=True)
+    return psycopg.connect(_dsn_with_timeout(DSN), autocommit=True)
 
 
 def ping() -> bool:
