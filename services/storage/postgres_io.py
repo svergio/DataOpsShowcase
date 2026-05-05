@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from typing import Any, Iterable, Iterator, Sequence
 
 from airflow.providers.postgres.hooks.postgres import PostgresHook
-from psycopg2.extras import execute_values
+from psycopg2.extras import Json, execute_values
 
 
 @contextmanager
@@ -40,6 +40,37 @@ def execute(conn_id: str, sql: str, params: Sequence[Any] | None = None) -> int:
         return cur.rowcount or 0
 
 
+def execute_sequence(
+    conn_id: str,
+    operations: Sequence[tuple[str, Sequence[Any] | None]],
+) -> list[int]:
+    hook = PostgresHook(postgres_conn_id=conn_id)
+    conn = hook.get_conn()
+    rowcounts: list[int] = []
+    try:
+        with conn.cursor() as cur:
+            for sql, params in operations:
+                cur.execute(sql, params or ())
+                rowcounts.append(cur.rowcount or 0)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+    return rowcounts
+
+
+def _adapt_cell(value: Any) -> Any:
+    if isinstance(value, dict | list):
+        return Json(value)
+    return value
+
+
+def _adapt_row(row: Sequence[Any]) -> tuple[Any, ...]:
+    return tuple(_adapt_cell(v) for v in row)
+
+
 def bulk_insert(
     conn_id: str,
     table: str,
@@ -49,7 +80,7 @@ def bulk_insert(
     page_size: int = 1000,
     on_conflict: str | None = None,
 ) -> int:
-    rows = list(rows)
+    rows = [_adapt_row(r) for r in rows]
     if not rows:
         return 0
     columns_sql = ", ".join(columns)

@@ -7,7 +7,6 @@ from airflow.decorators import dag, task
 from pipelines.dags.transformation._dbt_common import run_dbt_layer
 from pipelines.utils.dag_factory import default_args
 from pipelines.utils.datasets import DS_DBT_STAGING_DONE, DS_VAULT_SCD2_DONE
-from pipelines.utils.dbt_web_webhook import EVENT_INGESTION_COMPLETED, notify_dbt_web
 
 DAG_ID = "dag_dbt_staging_rest"
 
@@ -33,12 +32,6 @@ def dbt_staging_rest() -> None:
 
     @task(outlets=[DS_DBT_STAGING_DONE])
     def publish(payload: dict) -> dict:
-        notify_dbt_web(
-            event=EVENT_INGESTION_COMPLETED,
-            dag_id=DAG_ID,
-            run_id=str(payload.get("run_id") or ""),
-            target_layer="staging",
-        )
         return {"dag": DAG_ID, "status": "published", **payload}
 
     publish(run(freshness()))

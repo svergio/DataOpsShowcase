@@ -45,7 +45,7 @@ def _consume_one(topic_key: str) -> dict:
 
 @dag(
     dag_id=DAG_ID,
-    description="Kafka extension topics (marketing, SEO, HR, feature flags) -> raw.kafka_extension_events",
+    description="Kafka extension topics -> raw.kafka_extension_events (partial topic failures tolerated)",
     schedule=SCHEDULE,
     start_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
     catchup=False,
@@ -54,27 +54,44 @@ def _consume_one(topic_key: str) -> dict:
     tags=["ingestion", "kafka", "extensions"],
 )
 def ingest_kafka_extensions_to_raw() -> None:
-    @task(retries=3)
-    def ext_marketing() -> dict:
-        return _consume_one("marketing_email")
+    @task(retries=1)
+    def consume_extensions_consolidated() -> dict:
+        from services.common.config_loader import load_yaml
+        from services.common.logging_utils import get_logger
 
-    @task(retries=3)
-    def ext_seo() -> dict:
-        return _consume_one("seo_organic")
+        cfg_root = load_yaml("ingestion")
+        ext_cfg = cfg_root.get("kafka", {}).get("extensions") or {}
+        keys = list(ext_cfg.get("topic_keys") or [])
+        if not keys:
+            keys = ["marketing_email", "seo_organic", "hr_time_tracking", "feature_flag_eval"]
+        min_ok = int(ext_cfg.get("min_success_count", 1))
+        stats: list[dict] = []
+        errors: list[dict] = []
+        for topic_key in keys:
+            try:
+                stats.append(_consume_one(topic_key))
+            except Exception as exc:  # noqa: BLE001
+                errors.append({"topic_key": topic_key, "error": str(exc).replace("\n", " ")[:600]})
 
-    @task(retries=3)
-    def ext_hr() -> dict:
-        return _consume_one("hr_time_tracking")
+        if len(stats) < min_ok:
+            raise RuntimeError(
+                f"extensions ingest: only {len(stats)} topic(s) succeeded (min_success_count={min_ok}); "
+                f"errors={errors}"
+            )
 
-    @task(retries=3)
-    def ext_flags() -> dict:
-        return _consume_one("feature_flag_eval")
+        if errors:
+            get_logger(DAG_ID).warning(
+                "extensions partial failures",
+                extra={"extra_payload": {"ok": len(stats), "errors": errors}},
+            )
+
+        return {"stats": stats, "errors": errors, "ok_count": len(stats)}
 
     @task(outlets=[DS_RAW_KAFKA_EXTENSIONS])
-    def seal_extensions(marketing: dict, seo: dict, hr: dict, flags: dict) -> dict:
-        return {"dag": DAG_ID, "status": "published", "stats": [marketing, seo, hr, flags]}
+    def seal_extensions(payload: dict) -> dict:
+        return {"dag": DAG_ID, "status": "published", **payload}
 
-    seal_extensions(ext_marketing(), ext_seo(), ext_hr(), ext_flags())
+    seal_extensions(consume_extensions_consolidated())
 
 
 dag = ingest_kafka_extensions_to_raw()

@@ -17,8 +17,11 @@ datasets:
   dbt_staging_done: "dbt://staging"
   dbt_vault_done: "dbt://vault"
   dbt_marts_done: "dbt://marts"
+  dbt_dqc_done: "dbt://dqc"
   dq_passed: "dq://post-marts"
   serving_optimized: "serving://marts-optimized"
+  spark_analytics_done: "spark://analytics-summary"
+  spark_hive_finance_done: "spark://hive-finance-cbr-demo"
   ml_train_done: "ml://spark-training"
 
 dags:
@@ -53,6 +56,7 @@ dags:
     produces: [raw_kafka_extensions]
 
   - id: dag_spark_preprocess_to_stg
+    # Фактическое расписание в коде DAG: AND или OR по четырём raw Dataset (Variable spark_preprocess_mode).
     schedule: null
     layer: preprocessing
     consumes:
@@ -95,10 +99,16 @@ dags:
     consumes: [dbt_vault_done]
     produces: [dbt_marts_done]
 
+  - id: dag_dbt_dqc_rest
+    schedule: null
+    layer: dbt
+    consumes: [dbt_marts_done]
+    produces: [dbt_dqc_done]
+
   - id: dag_data_quality_checks
     schedule: null
     layer: quality
-    consumes: [dbt_marts_done]
+    consumes: [dbt_dqc_done]
     produces: [dq_passed]
 
   - id: dag_serving_optimizations
@@ -112,3 +122,15 @@ dags:
     layer: mlops
     consumes: [dbt_marts_done]
     produces: [ml_train_done]
+
+  - id: dag_spark_analytics_to_marts
+    schedule: null
+    layer: serving
+    consumes: [serving_optimized]
+    produces: [spark_analytics_done]
+
+  - id: dag_spark_hive_finance_cbr_demo
+    schedule: null
+    layer: transformation
+    consumes: [dbt_marts_done]
+    produces: [spark_hive_finance_done]

@@ -1,21 +1,4 @@
-services:
-  apache_atlas:
-    image: sburn/apache-atlas:${SBURN_APACHE_ATLAS_TAG:-latest}
-    container_name: atlas_server
-    restart: unless-stopped
-    environment:
-      TZ: UTC
-      ATLAS_JAVA_OPTS: ${ATLAS_JAVA_OPTS:- -Xmx3G -Xms1G}
-    networks:
-      - dataops_net
-    healthcheck:
-      test: ["CMD-SHELL", "bash -lc 'exec 3<>/dev/tcp/127.0.0.1/21000'"]
-      interval: 45s
-      timeout: 15s
-      retries: 30
-      start_period: 420s
-
-networks:
-  dataops_net:
-    external: true
-    name: ${ATLAS_EXTERNAL_NETWORK:-dataopsshowcase_dataops_net}
+# Deprecated: atlas_server is part of the root docker-compose.yml.
+# Start the full stack from DataOpsShowcase/: docker compose up -d
+# This file is kept empty so legacy commands with -f infra/metadata/atlas/docker-compose.atlas.yml do not duplicate services.
+services: {}

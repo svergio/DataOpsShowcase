@@ -1,4 +1,5 @@
--- Idempotent DDL for generator extensions (OLAP). On existing DB without this file, run once against DWH.
+-- Idempotent DDL for generator extensions (OLAP). Same objects are created in 04_dwh_extensions.sql;
+-- postgres_olap init uses 04 only (single pass). Keep this file to patch legacy volumes: psql -f 06_dwh_raw_generators_extensions.sql
 CREATE TABLE IF NOT EXISTS raw.kafka_extension_events (
   ingest_uuid UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   topic TEXT NOT NULL,

@@ -2,7 +2,7 @@ version: 2
 
 models:
   - name: stg_customers
-    description: "Staging view: latest snapshot per customer (raw.oltp_users), normalised + hash_key + hashdiff."
+    description: "Anonymized customers from Spark staging table (hashed + masked; no open PII)."
     config:
       tags: ['staging', 'customers']
     columns:
@@ -10,10 +10,12 @@ models:
         description: SHA-256 hash of customer_bk.
         tests: [not_null]
       - name: customer_bk
-        description: Business key (raw.oltp_users.user_id::text).
+        description: Business key (customer_id::text).
         tests: [not_null, unique]
-      - name: email
-      - name: full_name
+      - name: customer_hash
+        tests: [not_null]
+      - name: masked_email
+      - name: masked_name
       - name: registered_at
       - name: load_dts
         tests: [not_null]
@@ -106,16 +108,14 @@ models:
         tests:
           - not_null
           - relationships:
-              arguments:
-                to: ref('stg_orders')
-                field: order_bk
+              to: ref('stg_orders')
+              field: order_bk
       - name: product_bk
         tests:
           - not_null
           - relationships:
-              arguments:
-                to: ref('stg_products')
-                field: product_bk
+              to: ref('stg_products')
+              field: product_bk
       - name: quantity
       - name: unit_price
       - name: line_amount

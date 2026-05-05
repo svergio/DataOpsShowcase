@@ -1,0 +1,83 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {"type": "grafana", "uid": "-- Grafana --"},
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Dashboards",
+      "datasource": {"type": "postgres", "uid": "PGSUP"},
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
+      "targets": [
+        {
+          "format": "table",
+          "rawSql": "SELECT COUNT(*)::bigint AS value FROM dashboards WHERE slug IS NOT NULL;",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Charts (slices)",
+      "datasource": {"type": "postgres", "uid": "PGSUP"},
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0},
+      "targets": [
+        {
+          "format": "table",
+          "rawSql": "SELECT COUNT(*)::bigint AS value FROM slices;",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Datasets (tables)",
+      "datasource": {"type": "postgres", "uid": "PGSUP"},
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 0},
+      "targets": [
+        {
+          "format": "table",
+          "rawSql": "SELECT COUNT(*)::bigint AS value FROM tables;",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Recent dashboard edits",
+      "datasource": {"type": "postgres", "uid": "PGSUP"},
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 5},
+      "targets": [
+        {
+          "format": "table",
+          "rawSql": "SELECT slug, dashboard_title, changed_on FROM dashboards ORDER BY changed_on DESC NULLS LAST LIMIT 20;",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "tags": ["superset", "meta", "postgres"],
+  "templating": {"list": []},
+  "time": {"from": "now-24h", "to": "now"},
+  "title": "Superset metadata health",
+  "uid": "superset-meta-ops",
+  "version": 1
+}

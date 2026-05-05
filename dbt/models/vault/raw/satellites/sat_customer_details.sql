@@ -13,14 +13,14 @@
     ]
 ) }}
 
-{# Customer descriptive satellite. SCD2 with late-arriving support.
-   Tracks: email, full_name, registered_at. #}
+{# Customer descriptive satellite. SCD2; payload is anonymized (hash + masked fields only). #}
 WITH src AS (
     SELECT
         hub_key,
         hashdiff,
-        email,
-        full_name,
+        customer_hash,
+        masked_email,
+        masked_name,
         registered_at,
         load_dts,
         effective_from,
@@ -51,8 +51,9 @@ SELECT
     CAST(NULL AS TIMESTAMPTZ) AS effective_to,
     TRUE                      AS is_current,
     d.record_source,
-    d.email,
-    d.full_name,
+    d.customer_hash,
+    d.masked_email,
+    d.masked_name,
     d.registered_at
 FROM deduped d
 {% if is_incremental() %}

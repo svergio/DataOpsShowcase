@@ -10,7 +10,6 @@ from pipelines.dags.ingestion._kafka_common import (
 )
 from pipelines.utils.dag_factory import default_args
 from pipelines.utils.datasets import DS_RAW_KAFKA_PAYMENTS
-from pipelines.utils.dbt_web_webhook import EVENT_INGESTION_COMPLETED, notify_dbt_web
 
 DAG_ID = "dag_ingest_kafka_payments_to_raw"
 SCHEDULE = "*/5 * * * *"
@@ -65,12 +64,6 @@ def ingest_kafka_payments_to_raw() -> None:
         get_logger(DAG_ID).info(
             "kafka.payments raw signal",
             extra={"extra_payload": stats},
-        )
-        notify_dbt_web(
-            event=EVENT_INGESTION_COMPLETED,
-            dag_id=DAG_ID,
-            run_id=airflow_run_ref,
-            target_layer="raw.kafka_payments",
         )
         return {"dag": DAG_ID, "status": "published", **stats}
 

@@ -37,11 +37,13 @@ satellites:
     effective_from_column: registered_at
     record_source_value: oltp.users
     descriptive_columns:
-      - email
-      - full_name
+      - customer_hash
+      - masked_email
+      - masked_name
     hash_diff_columns:
-      - email
-      - full_name
+      - customer_hash
+      - masked_email
+      - masked_name
 
   sat_order_status:
     parent_hub: hub_orders

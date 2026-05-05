@@ -1,0 +1,70 @@
+{
+  "editable": true,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Today Gross Sales",
+      "datasource": { "type": "postgres", "uid": "PGDWH" },
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "format": "table",
+          "rawSql": "SELECT COALESCE(SUM(gross_sales),0)::double precision AS value FROM dwh_marts.fct_daily_sales WHERE order_date = CURRENT_DATE;",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Orders (30d)",
+      "datasource": { "type": "postgres", "uid": "PGDWH" },
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 0 },
+      "targets": [
+        {
+          "format": "table",
+          "rawSql": "SELECT COUNT(*)::double precision AS value FROM dwh_marts.fct_orders WHERE order_date >= CURRENT_DATE - INTERVAL '30 day';",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Avg Order Value (30d)",
+      "datasource": { "type": "postgres", "uid": "PGDWH" },
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 0 },
+      "targets": [
+        {
+          "format": "table",
+          "rawSql": "SELECT COALESCE(AVG(total_amount),0)::double precision AS value FROM dwh_marts.fct_orders WHERE order_date >= CURRENT_DATE - INTERVAL '30 day';",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Daily Sales Trend",
+      "datasource": { "type": "postgres", "uid": "PGDWH" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 6 },
+      "targets": [
+        {
+          "format": "time_series",
+          "rawSql": "SELECT order_date::timestamp AS time, SUM(gross_sales)::double precision AS value FROM dwh_marts.fct_daily_sales WHERE order_date >= CURRENT_DATE - INTERVAL '30 day' GROUP BY 1 ORDER BY 1;",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "tags": ["kpi", "business"],
+  "templating": { "list": [] },
+  "time": { "from": "now-30d", "to": "now" },
+  "title": "Business KPIs",
+  "uid": "business-kpis",
+  "version": 1
+}

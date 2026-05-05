@@ -9,7 +9,6 @@ from airflow.utils.trigger_rule import TriggerRule
 
 from pipelines.utils.dag_factory import default_args, sla_minutes
 from pipelines.utils.datasets import DS_RAW_OLTP
-from pipelines.utils.dbt_web_webhook import EVENT_INGESTION_COMPLETED, notify_dbt_web
 
 
 DAG_ID = "dag_ingest_oltp_to_stg"
@@ -191,12 +190,6 @@ def ingest_oltp_to_stg() -> None:
         logger.info(
             "raw oltp signal emitted",
             extra={"extra_payload": {"dag": DAG_ID, "dataset": "raw_oltp"}},
-        )
-        notify_dbt_web(
-            event=EVENT_INGESTION_COMPLETED,
-            dag_id=DAG_ID,
-            run_id=airflow_run_ref,
-            target_layer="raw.oltp",
         )
         return {"dag": DAG_ID, "status": "published"}
 

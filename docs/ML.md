@@ -26,6 +26,10 @@
 - **Tracking URI** и имя эксперимента задаются переменными окружения (см. `docker-compose`, переменные в DAG `dag_ml_train_spark`).
 - UI MLflow: через ingress, см. [WEB_UI_ACCESS.md](WEB_UI_ACCESS.md).
 
+## NL2SQL-сервис (не каталог `ml/`)
+
+Отдельное приложение **`nl2sql_app`**: RAG по схеме DWH, загрузка модели из **MLflow** (`pyfunc`), ответы по **`POST /query`**. За ingress: **`/nl2sql/`**. Полное описание переменных, health, MLflow и ограничений по памяти — **[services/nl2sql_app/README.md](../services/nl2sql_app/README.md)**; маршрут и типичные сбои — [WEB_UI_ACCESS.md](WEB_UI_ACCESS.md) (раздел NL2SQL). В сводке стека — [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md).
+
 ## Минимальный ручной чек-лист
 
 1. Поднять стек и Airflow, убедиться, что `dag_ml_train_spark` виден.

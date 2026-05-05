@@ -88,7 +88,13 @@ def read_jsonl(client: Minio, bucket: str, key: str) -> list[dict]:
         line = line.strip()
         if not line:
             continue
-        rows.append(json.loads(line))
+        try:
+            rows.append(json.loads(line))
+        except json.JSONDecodeError:
+            logger.warning(
+                "skip invalid jsonl line",
+                extra={"extra_payload": {"key": key, "preview": line[:200]}},
+            )
     return rows
 
 

@@ -5,7 +5,7 @@ from typing import Any
 
 from services.common.config_loader import load_yaml
 from services.common.logging_utils import get_logger
-from services.storage.postgres_io import execute, fetch_one
+from services.storage.postgres_io import execute, execute_sequence, fetch_one
 
 logger = get_logger(__name__)
 DWH_CONN_ID = "postgres_dwh"
@@ -110,11 +110,15 @@ def _load_sat_customer_details(record_source: str, conn_id: str) -> LoadStats:
         SELECT
             ENCODE(SHA256(CONVERT_TO(CAST(customer_id AS TEXT), 'UTF8')), 'hex') AS customer_hk,
             COALESCE(registered_at, NOW()) AS effective_from,
-            ENCODE(SHA256(CONVERT_TO(email || '||' || full_name, 'UTF8')), 'hex') AS hash_diff,
-            email,
-            full_name
+            ENCODE(SHA256(CONVERT_TO(
+                COALESCE(customer_hash, '') || '||' || COALESCE(masked_email, '') || '||' || COALESCE(masked_name, ''),
+                'UTF8'
+            )), 'hex') AS hash_diff,
+            customer_hash,
+            masked_email,
+            masked_name
         FROM staging.stg_customers
-        WHERE customer_id IS NOT NULL AND email IS NOT NULL;
+        WHERE customer_id IS NOT NULL AND customer_hash IS NOT NULL;
     """
     close_sql = """
         UPDATE vault.sat_customer_details s
@@ -129,7 +133,7 @@ def _load_sat_customer_details(record_source: str, conn_id: str) -> LoadStats:
     insert_sql = """
         INSERT INTO vault.sat_customer_details (
             customer_hk, load_dts, effective_from, effective_to, is_current,
-            hash_diff, email, full_name, record_source
+            hash_diff, customer_hash, masked_email, masked_name, record_source
         )
         SELECT inbox.customer_hk,
                NOW() AS load_dts,
@@ -137,8 +141,9 @@ def _load_sat_customer_details(record_source: str, conn_id: str) -> LoadStats:
                NULL,
                TRUE,
                inbox.hash_diff,
-               inbox.email,
-               inbox.full_name,
+               inbox.customer_hash,
+               inbox.masked_email,
+               inbox.masked_name,
                %s
         FROM tmp_sat_customer_inbox inbox
         LEFT JOIN vault.sat_customer_details existing
@@ -147,9 +152,11 @@ def _load_sat_customer_details(record_source: str, conn_id: str) -> LoadStats:
         WHERE existing.customer_hk IS NULL OR existing.hash_diff <> inbox.hash_diff
         ON CONFLICT (customer_hk, load_dts) DO NOTHING;
     """
-    execute(conn_id, incoming_sql)
-    execute(conn_id, close_sql)
-    inserted = execute(conn_id, insert_sql, (record_source,))
+    counts = execute_sequence(
+        conn_id,
+        [(incoming_sql, None), (close_sql, None), (insert_sql, (record_source,))],
+    )
+    inserted = counts[2]
     return LoadStats(name="sat_customer_details", inserted=inserted)
 
 
@@ -199,9 +206,11 @@ def _load_sat_order_status(record_source: str, conn_id: str) -> LoadStats:
         WHERE existing.order_hk IS NULL OR existing.hash_diff <> inbox.hash_diff
         ON CONFLICT (order_hk, load_dts) DO NOTHING;
     """
-    execute(conn_id, incoming_sql)
-    execute(conn_id, close_sql)
-    inserted = execute(conn_id, insert_sql, (record_source,))
+    counts = execute_sequence(
+        conn_id,
+        [(incoming_sql, None), (close_sql, None), (insert_sql, (record_source,))],
+    )
+    inserted = counts[2]
     return LoadStats(name="sat_order_status", inserted=inserted)
 
 

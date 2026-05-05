@@ -4,8 +4,8 @@ conn_id: postgres_dwh
 
 indexes:
   - table: marts.dim_customers
-    name: idx_dim_customers_email
-    columns: [email]
+    name: idx_dim_customers_customer_bk
+    columns: [customer_bk]
   - table: marts.dim_customers
     name: idx_dim_customers_current
     columns: [customer_bk]
@@ -24,3 +24,32 @@ vacuum_analyze:
 reindex:
   - marts.dim_customers
   - marts.fct_orders
+
+redis_serving:
+  redis_url_env: REDIS_URL
+  redis_url_default: redis://redis:6379/0
+  key_prefix: techmart:serving
+  snapshot_table: dwh_marts.redis_serving_snapshot
+  metrics:
+    - metric_key: daily_sales_gross
+      value_type: numeric
+      redis_key: daily_sales_gross
+      sql: |
+        SELECT COALESCE(SUM(gross_sales), 0)::numeric
+        FROM dwh_marts.fct_daily_sales
+        WHERE order_date = CURRENT_DATE
+    - metric_key: active_customers_30d
+      value_type: integer
+      redis_key: active_customers_30d
+      sql: |
+        SELECT COUNT(DISTINCT customer_hub_key)::bigint
+        FROM dwh_marts.fct_orders
+        WHERE order_date >= CURRENT_DATE - INTERVAL '30 day'
+    - metric_key: top_product_category_today
+      value_type: text
+      redis_key: top_product_category_today
+      sql: |
+        SELECT COALESCE(category, 'unknown')
+        FROM dwh_marts.dim_products
+        ORDER BY mart_load_dts DESC
+        LIMIT 1

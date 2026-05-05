@@ -3,8 +3,14 @@ FROM apache/airflow:${AIRFLOW_IMAGE_TAG}
 
 USER root
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get install -y --no-install-recommends \
+       build-essential \
+       openjdk-17-jre-headless \
+       procps \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sfn "/usr/lib/jvm/java-17-openjdk-$(dpkg --print-architecture)" /usr/local/airflow-java
+
+ENV JAVA_HOME=/usr/local/airflow-java
 
 USER airflow
 COPY services/airflow/requirements.txt /tmp/requirements.txt

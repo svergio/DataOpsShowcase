@@ -35,3 +35,7 @@ pipelines:
   minio.files:
     watermark_type: file_marker
     state_table: raw.minio_files_landing
+
+  serving.redis:
+    watermark_type: timestamp
+    column: updated_at

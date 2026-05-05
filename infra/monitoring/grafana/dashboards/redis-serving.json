@@ -1,0 +1,48 @@
+{
+  "editable": true,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Redis Uptime (seconds)",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "redis_uptime_in_seconds", "refId": "A" }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Redis Commands Processed",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 6, "w": 18, "x": 6, "y": 0 },
+      "targets": [
+        { "expr": "rate(redis_commands_processed_total[5m])", "legendFormat": "cmd/s", "refId": "A" }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "table",
+      "title": "Serving Snapshot (dwh_marts.redis_serving_snapshot)",
+      "datasource": { "type": "postgres", "uid": "PGDWH" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 6 },
+      "targets": [
+        {
+          "format": "table",
+          "rawSql": "SELECT metric_key, metric_value_num, metric_value_text, updated_at FROM dwh_marts.redis_serving_snapshot ORDER BY updated_at DESC;",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["redis", "serving"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "title": "Redis Serving",
+  "uid": "redis-serving",
+  "version": 1
+}

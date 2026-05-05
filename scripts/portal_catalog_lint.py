@@ -3,8 +3,8 @@
 Cross-check portal services/portal_web/data/catalog.json container names against
 docker-compose.yml container_name fields.
 
-Optional-only services (Atlas, CDC): containers tied to graph nodes with `"optional": true`
-are excluded from the strict check when they are absent from the main compose file.
+Optional-only services: containers tied to graph nodes with `"optional": true`
+are excluded from the strict check when absent from compose (e.g. profile-only `data_generator`).
 
 Usage (from repo root):
   python scripts/portal_catalog_lint.py
@@ -75,7 +75,7 @@ def main() -> int:
         for m in missing:
             print(f"  - {m}", file=sys.stderr)
         print(
-            "\n(Containers marked optional on graph nodes in catalog are skipped — CDC/Atlas overlays.)",
+            "\n(Containers marked optional on graph nodes in catalog are skipped when not in compose.)",
             file=sys.stderr,
         )
         return 1

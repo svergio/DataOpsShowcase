@@ -3,7 +3,7 @@
     incremental_strategy='append',
     unique_key=['hub_key', 'load_dts'],
     on_schema_change='append_new_columns',
-    tags=['vault', 'bdv', 'business_satellite', 'scd2'],
+    tags=['vault', 'bdv', 'satellite', 'scd2'],
     post_hook=[
         "{{ scd2_recompute_timeline() }}"
     ],
@@ -13,17 +13,12 @@
     ]
 ) }}
 
-{# Business satellite for customers.
-   Applies business rules on top of sat_customer_details (raw):
-     * email_domain extraction
-     * customer_segment derived from total spend in sat_order_status (last 90d)
-     * is_email_valid flag (regex)
-     * recomputes hashdiff over the BUSINESS payload for clean SCD2 #}
+{# Business satellite: rules on anonymized customer sat (masked_email domain only). #}
 WITH raw_sat AS (
     SELECT
         s.hub_key,
-        s.email,
-        s.full_name,
+        s.masked_email,
+        s.masked_name,
         s.registered_at,
         s.load_dts,
         s.effective_from,
@@ -47,11 +42,11 @@ spend_90d AS (
 enriched AS (
     SELECT
         rs.hub_key,
-        rs.email,
-        rs.full_name,
+        rs.masked_email,
+        rs.masked_name,
         rs.registered_at,
-        SPLIT_PART(rs.email, '@', 2)                                  AS email_domain,
-        (rs.email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$') AS is_email_valid,
+        SPLIT_PART(rs.masked_email, '@', 2)                                  AS email_domain,
+        (rs.masked_email ~* '^[A-Za-z0-9.*_%-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$') AS is_email_valid,
         COALESCE(s.total_spend_90d, 0)                                AS spend_90d,
         COALESCE(s.order_count_90d, 0)                                AS order_count_90d,
         CASE

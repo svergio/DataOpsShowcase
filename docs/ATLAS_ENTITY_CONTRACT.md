@@ -6,7 +6,7 @@
 
 | Домен | `typeName` (базовый) | Шаблон `qualifiedName` |
 |--------|------------------|------------------------|
-| JDBC / Postgres БД (hive mirror) | `hive_db` | `{database}@{cluster}`, например `techmart_oltp@dataops` |
+| JDBC / Postgres БД (в Atlas как типы `hive_*`; не Apache Hive) | `hive_db` | `{database}@{cluster}`, например `techmart_oltp@dataops` |
 | JDBC / Postgres таблица | `hive_table` | `{database}.{schema}.{table}@{cluster}` |
 | Kafka topic | `kafka_topic` | `kafka://{cluster_id}@{network}/{topic_name}` |
 | Debezium connector | `Process` | `debezium://{cluster_id}@{network}/{connector_slug}` |

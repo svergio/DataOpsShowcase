@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NL2SQL HR</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/app.css', v=asset_version) }}"
+    />
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="hero">
+        <div class="hero-inner">
+          <h1 class="app-title">NL2SQL HR</h1>
+          <p class="hero-lead">
+            Вопросы на естественном языке к HR-витринам в DWH: RAG по схеме, затем SQL и визуализация.
+          </p>
+          {% if show_registry_warning %}
+          <p class="hero-warn" role="alert">
+            В Model Registry нет зарегистрированной модели. Укажите
+            <code>NL2SQL_AUTO_LOG_MODEL=true</code> при старте или зарегистрируйте артефакт вручную. Подробности в
+            <code>services/nl2sql_app/README.md</code>.
+          </p>
+          {% endif %}
+          {% if show_load_error %}
+          <p class="hero-bad" role="alert">
+            Не удалось загрузить веса MLflow (см. логи <code>nl2sql_app</code>). Проверьте URI модели и память Docker.
+          </p>
+          {% endif %}
+          {% if registry_ok and not model_loaded and not show_load_error %}
+          <p class="hero-meta">
+            Модель в registry найдена; веса подгрузятся при <strong>первом</strong> запросе (возможна задержка и пик RAM).
+          </p>
+          {% endif %}
+        </div>
+      </header>
+
+      <div class="nl2sql-grid">
+        <section class="panel panel--chat">
+          <div class="panel-head panel-head--chat">
+            <div class="panel-head-text">
+              <h2 class="panel-title">Чат с моделью</h2>
+              <p class="panel-lead">
+                Напишите вопрос на русском: здесь появится диалог; справа — сгенерированный SQL и таблица или график.
+              </p>
+            </div>
+            <span class="panel-badge" title="Метод API">POST /query</span>
+          </div>
+          <div id="messages" class="messages" aria-live="polite">
+            <p class="messages-placeholder">
+              Пока нет сообщений. Введите вопрос в поле ниже и нажмите «Отправить» — ответы появятся в этом окне.
+            </p>
+          </div>
+          <form id="query-form" class="query-form">
+            <label class="sr-only" for="question">Вопрос</label>
+            <textarea
+              id="question"
+              name="question"
+              rows="3"
+              autocomplete="off"
+              placeholder="Например: сколько сотрудников в каждом отделе за последний квартал?"
+              required
+            ></textarea>
+            <button type="submit" class="btn-send">Отправить</button>
+          </form>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2 class="panel-title">SQL и результат</h2>
+          </div>
+          <p class="panel-sub">Сгенерированный запрос</p>
+          <pre id="sql-output" class="sql-pre"></pre>
+          <p class="panel-sub">Данные и график</p>
+          <div id="chart-root" class="chart-root"></div>
+        </section>
+      </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/app.js', v=asset_version) }}"></script>
+  </body>
+</html>

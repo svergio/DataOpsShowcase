@@ -24,6 +24,7 @@ DEFAULT_BUCKET = "mlflow-artifacts"
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--execution-ts", required=True)
+    parser.add_argument("--env", default=os.environ.get("SPARK_JOB_ENV", "production"))
     parser.add_argument("--jdbc-url", default=os.environ.get("DWH_JDBC_URL"))
     parser.add_argument("--jdbc-user", default=os.environ.get("DWH_JDBC_USER"))
     parser.add_argument("--jdbc-password", default=os.environ.get("DWH_JDBC_PASSWORD"))
@@ -90,14 +91,10 @@ def main() -> int:
                     F.col("order_ts"),
                     F.col("total_amount"),
                 )
-            except Exception:
-                orders = spark.read.jdbc(args.jdbc_url, "raw.oltp_orders", properties=props).select(
-                    F.col("status"),
-                    F.col("currency_code").alias("currency"),
-                    F.col("user_id").cast("string").alias("customer_bk"),
-                    F.col("order_ts"),
-                    F.col("total_amount"),
-                )
+            except Exception as exc:
+                raise RuntimeError(
+                    "ML training requires anonymized staging.stg_orders (or dwh_staging.stg_orders); raw OLTP is not used."
+                ) from exc
         training_df = (
             orders.select("status", "currency", "customer_bk", "order_ts", "total_amount")
             .where(F.col("order_ts").isNotNull() & F.col("total_amount").isNotNull())

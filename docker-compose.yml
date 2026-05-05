@@ -56,7 +56,6 @@ services:
       - ./services/postgres/init/03_dwh_schema.sql:/docker-entrypoint-initdb.d/03_dwh_schema.sql:ro
       - ./services/postgres/init/04_dwh_extensions.sql:/docker-entrypoint-initdb.d/04_dwh_extensions.sql:ro
       - ./services/postgres/init/05_meta_views.sql:/docker-entrypoint-initdb.d/05_meta_views.sql:ro
-      - ./services/postgres/init/06_dwh_raw_generators_extensions.sql:/docker-entrypoint-initdb.d/06_dwh_raw_generators_extensions.sql:ro
       - ./services/postgres/cdc/olap_debezium_bootstrap.sh:/docker-entrypoint-initdb.d/99_debezium_bootstrap.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${PG_OLAP_USER} -d ${PG_OLAP_DB}"]
@@ -115,6 +114,40 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    networks:
+      - dataops_net
+
+  redis_exporter:
+    image: oliver006/redis_exporter:${REDIS_EXPORTER_IMAGE_TAG:-v1.64.0}
+    container_name: redis_exporter
+    restart: unless-stopped
+    command:
+      - --redis.addr=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9121/metrics || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - dataops_net
+
+  kafka_exporter:
+    image: danielqsj/kafka-exporter:${KAFKA_EXPORTER_IMAGE_TAG:-v1.7.0}
+    container_name: kafka_exporter
+    restart: unless-stopped
+    command:
+      - --kafka.server=kafka:9092
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9308/metrics || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
     networks:
       - dataops_net
 
@@ -251,10 +284,10 @@ services:
         KAFKA_BOOTSTRAP_SERVERS: kafka:9092
         KAFKA_TOPIC_ORDERS: ${KAFKA_TOPIC_ORDERS}
         KAFKA_TOPIC_PAYMENTS: ${KAFKA_TOPIC_PAYMENTS}
-        KAFKA_TOPIC_MARKETING_EMAIL: ${KAFKA_TOPIC_MARKETING_EMAIL:-}
-        KAFKA_TOPIC_SEO_ORGANIC: ${KAFKA_TOPIC_SEO_ORGANIC:-}
-        KAFKA_TOPIC_HR_TIME_TRACKING: ${KAFKA_TOPIC_HR_TIME_TRACKING:-}
-        KAFKA_TOPIC_FEATURE_FLAG_EVAL: ${KAFKA_TOPIC_FEATURE_FLAG_EVAL:-}
+        KAFKA_TOPIC_MARKETING_EMAIL: ${KAFKA_TOPIC_MARKETING_EMAIL:-techmart.marketing.email_events}
+        KAFKA_TOPIC_SEO_ORGANIC: ${KAFKA_TOPIC_SEO_ORGANIC:-techmart.seo.organic_sessions}
+        KAFKA_TOPIC_HR_TIME_TRACKING: ${KAFKA_TOPIC_HR_TIME_TRACKING:-techmart.hr.time_tracking}
+        KAFKA_TOPIC_FEATURE_FLAG_EVAL: ${KAFKA_TOPIC_FEATURE_FLAG_EVAL:-techmart.features.evaluated}
         MINIO_ENDPOINT: minio:9000
         MINIO_ROOT_USER: ${MINIO_ROOT_USER}
         MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
@@ -269,12 +302,12 @@ services:
         MINIO_PREFIX_HR_PERF: ${MINIO_PREFIX_HR_PERF:-}
         DBT_REST_BASE_URL: ${DBT_REST_BASE_URL:-http://dbt-rest:8580}
         DBT_REST_TOKEN: ${DBT_REST_TOKEN:-}
-        DBT_WEB_BASE_URL: ${DBT_WEB_BASE_URL:-http://dbt-web-backend:8010}
-        DBT_WEB_TOKEN: ${DBT_WEB_TOKEN:-}
         PROMETHEUS_PUSHGATEWAY_URL: ${PROMETHEUS_PUSHGATEWAY_URL:-http://pushgateway:9091}
         DWH_JDBC_URL: jdbc:postgresql://postgres_olap:5432/${PG_OLAP_DB}
         DWH_JDBC_USER: ${PG_OLAP_USER}
         DWH_JDBC_PASSWORD: ${PG_OLAP_PASSWORD}
+        SPARK_PRIVACY_SALT: ${SPARK_PRIVACY_SALT:-dev-not-for-production}
+        SPARK_JOB_ENV: ${SPARK_JOB_ENV:-production}
         MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}
         MLFLOW_EXPERIMENT_NAME: ${MLFLOW_EXPERIMENT_NAME}
         MLFLOW_MODEL_NAME: ${MLFLOW_MODEL_NAME}
@@ -469,42 +502,6 @@ services:
     networks:
       - dataops_net
 
-  dbt_web_backend:
-    build:
-      context: ./services/dbt_web
-      dockerfile: docker/Dockerfile.backend
-    image: dataops/dbt-web-backend:local
-    container_name: dbt-web-backend
-    restart: unless-stopped
-    environment:
-      DBT_WEB_PORT: 8010
-      DBT_WEB_SECRET_KEY: ${DBT_WEB_SECRET_KEY:-dev-dbt-web-secret}
-      DBT_WEB_UI_PATH: ${DBT_WEB_UI_PATH:-/dbt}
-      DBT_WEB_AUTH_USER: ${DBT_WEB_AUTH_USER:-admin}
-      DBT_WEB_AUTH_PASSWORD: ${DBT_WEB_AUTH_PASSWORD:-admin}
-      DBT_REST_BASE_URL: ${DBT_REST_BASE_URL:-http://dbt-rest:8580}
-      DBT_REST_TOKEN: ${DBT_REST_TOKEN:-}
-      DBT_WEB_STORAGE_ENDPOINT: ${DBT_WEB_STORAGE_ENDPOINT:-http://minio:9000}
-      DBT_WEB_STORAGE_ACCESS_KEY: ${DBT_WEB_STORAGE_ACCESS_KEY:-${MINIO_ROOT_USER}}
-      DBT_WEB_STORAGE_SECRET_KEY: ${DBT_WEB_STORAGE_SECRET_KEY:-${MINIO_ROOT_PASSWORD}}
-      DBT_WEB_STORAGE_SECURE: ${DBT_WEB_STORAGE_SECURE:-false}
-      DBT_WEB_ARTIFACT_BUCKET: ${DBT_WEB_ARTIFACT_BUCKET:-dbt-artifacts}
-      DBT_WEB_DB_DSN: ${DBT_WEB_DB_DSN:-postgresql://${PG_OLAP_USER}:${PG_OLAP_PASSWORD}@postgres_olap:5432/${PG_OLAP_DB}}
-    depends_on:
-      postgres_olap:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-      dbt_rest:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8010/api/v1/health')\""]
-      interval: 20s
-      timeout: 10s
-      retries: 10
-    networks:
-      - dataops_net
-
   superset_init:
     build:
       context: ./services/superset
@@ -515,6 +512,9 @@ services:
     container_name: superset_init
     restart: "no"
     environment:
+      INGRESS_BASE_URL: ${INGRESS_BASE_URL:-http://localhost:8090}
+      SUPERSET_APP_ROOT: /superset
+      SUPERSET_WEBSERVER_BASE_URL: ${INGRESS_BASE_URL:-http://localhost:8090}/superset/
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
       SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
       SUPERSET_ADMIN_USERNAME: ${SUPERSET_ADMIN_USER}
@@ -549,6 +549,9 @@ services:
     container_name: superset
     restart: unless-stopped
     environment:
+      INGRESS_BASE_URL: ${INGRESS_BASE_URL:-http://localhost:8090}
+      SUPERSET_APP_ROOT: /superset
+      SUPERSET_WEBSERVER_BASE_URL: ${INGRESS_BASE_URL:-http://localhost:8090}/superset/
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
       SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
       SQLALCHEMY_DATABASE_URI: postgresql+psycopg2://${PG_META_USER}:${PG_META_PASSWORD}@postgres_metadb:5432/${SUPERSET_DB_NAME:-superset}
@@ -565,7 +568,11 @@ services:
       superset_init:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8088/health')\""]
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8088/superset/health')\"",
+        ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -610,6 +617,25 @@ services:
       retries: 5
     networks:
       - dataops_net
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: cadvisor
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - dataops_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   prometheus:
     image: prom/prometheus:${PROMETHEUS_IMAGE_TAG}
@@ -676,10 +702,10 @@ services:
       KAFKA_TOPIC_ORDERS: ${KAFKA_TOPIC_ORDERS:-}
       KAFKA_TOPIC_PAYMENTS: ${KAFKA_TOPIC_PAYMENTS:-}
       KAFKA_TOPIC_SHIPMENTS: ${KAFKA_TOPIC_SHIPMENTS:-}
-      KAFKA_TOPIC_MARKETING_EMAIL: ${KAFKA_TOPIC_MARKETING_EMAIL:-}
-      KAFKA_TOPIC_SEO_ORGANIC: ${KAFKA_TOPIC_SEO_ORGANIC:-}
-      KAFKA_TOPIC_HR_TIME_TRACKING: ${KAFKA_TOPIC_HR_TIME_TRACKING:-}
-      KAFKA_TOPIC_FEATURE_FLAG_EVAL: ${KAFKA_TOPIC_FEATURE_FLAG_EVAL:-}
+      KAFKA_TOPIC_MARKETING_EMAIL: ${KAFKA_TOPIC_MARKETING_EMAIL:-techmart.marketing.email_events}
+      KAFKA_TOPIC_SEO_ORGANIC: ${KAFKA_TOPIC_SEO_ORGANIC:-techmart.seo.organic_sessions}
+      KAFKA_TOPIC_HR_TIME_TRACKING: ${KAFKA_TOPIC_HR_TIME_TRACKING:-techmart.hr.time_tracking}
+      KAFKA_TOPIC_FEATURE_FLAG_EVAL: ${KAFKA_TOPIC_FEATURE_FLAG_EVAL:-techmart.features.evaluated}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       REDIS_CHANNEL_ORDERS: ${REDIS_CHANNEL_ORDERS:-}
       REDIS_CHANNEL_PAYMENTS: ${REDIS_CHANNEL_PAYMENTS:-}
@@ -744,6 +770,144 @@ services:
     networks:
       - dataops_net
 
+  schema_registry:
+    image: confluentinc/cp-schema-registry:${CP_SCHEMA_REGISTRY_TAG:-7.6.1}
+    hostname: schema_registry
+    container_name: schema_registry
+    restart: unless-stopped
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema_registry
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:9092
+      SCHEMA_REGISTRY_DEBUG: "true"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8081/subjects >/dev/null"]
+      interval: 20s
+      timeout: 10s
+      retries: 20
+      start_period: 45s
+    networks:
+      - dataops_net
+
+  debezium_connect:
+    image: debezium/connect:${DEBEZIUM_CONNECT_TAG:-2.5}
+    hostname: debezium_connect
+    container_name: debezium_connect
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+      schema_registry:
+        condition: service_healthy
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: ${DEBEZIUM_GROUP_ID:-debezium-cluster}
+      CONFIG_STORAGE_TOPIC: debezium_connect_configs
+      OFFSET_STORAGE_TOPIC: debezium_connect_offsets
+      STATUS_STORAGE_TOPIC: debezium_connect_status
+      CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      STATUS_STORAGE_REPLICATION_FACTOR: 1
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_PLUGIN_PATH: /kafka/connect
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8083/connectors >/dev/null 2>&1"]
+      interval: 20s
+      timeout: 10s
+      retries: 30
+      start_period: 90s
+    networks:
+      - dataops_net
+
+  atlas_server:
+    image: sburn/apache-atlas:${SBURN_APACHE_ATLAS_TAG:-latest}
+    container_name: atlas_server
+    restart: unless-stopped
+    environment:
+      TZ: UTC
+      ATLAS_JAVA_OPTS: ${ATLAS_JAVA_OPTS:- -Xmx3G -Xms1G}
+    healthcheck:
+      test: ["CMD-SHELL", "bash -lc 'exec 3<>/dev/tcp/127.0.0.1/21000'"]
+      interval: 45s
+      timeout: 15s
+      retries: 30
+      start_period: 420s
+    networks:
+      - dataops_net
+
+  node_red:
+    build:
+      context: ./services/node_red
+      dockerfile: Dockerfile
+      args:
+        NODE_RED_IMAGE_TAG: ${NODE_RED_IMAGE_TAG:-4.1.8-22}
+    image: dataops/node-red:local
+    container_name: node_red
+    restart: unless-stopped
+    environment:
+      NODE_RED_ADMIN_USER: ${NODE_RED_ADMIN_USER:-admin}
+      NODE_RED_ADMIN_PASSWORD: ${NODE_RED_ADMIN_PASSWORD:-changeme}
+    volumes:
+      - node_red_data:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://127.0.0.1:1880/node-red/',r=>process.exit([200,401,302,304].includes(r.statusCode)?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: 20s
+      timeout: 10s
+      retries: 8
+      start_period: 40s
+    networks:
+      - dataops_net
+
+  # NL2SQL HR: HTTP UI/API on container port 8060 (ingress /nl2sql/ -> nl2sql_app:8060; Prometheus scrapes :8060/metrics).
+  nl2sql_app:
+    build:
+      context: .
+      dockerfile: services/nl2sql_app/Dockerfile
+    image: dataops/nl2sql-app:local
+    container_name: nl2sql_app
+    restart: unless-stopped
+    environment:
+      DB_URL: ${NL2SQL_DB_URL:-postgresql+psycopg2://${PG_OLAP_USER}:${PG_OLAP_PASSWORD}@postgres_olap:5432/${PG_OLAP_DB}}
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://mlflow:5000}
+      NL2SQL_MODEL_URI: ${NL2SQL_MODEL_URI:-models:/nl2sql_qwen/latest}
+      NL2SQL_MODEL_NAME: ${NL2SQL_MODEL_NAME:-nl2sql_qwen}
+      NL2SQL_AUTO_LOG_MODEL: ${NL2SQL_AUTO_LOG_MODEL:-false}
+      NL2SQL_BASE_MODEL_ID: ${NL2SQL_BASE_MODEL_ID:-Qwen/Qwen2.5-3B-Instruct}
+      NL2SQL_EMBEDDING_MODEL: ${NL2SQL_EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+      NL2SQL_RAG_TOP_K: ${NL2SQL_RAG_TOP_K:-3}
+      NL2SQL_MAX_NEW_TOKENS: ${NL2SQL_MAX_NEW_TOKENS:-256}
+      NL2SQL_TEMPERATURE: ${NL2SQL_TEMPERATURE:-0.0}
+      NL2SQL_MODEL_DEVICE: ${NL2SQL_MODEL_DEVICE:-cpu}
+      NL2SQL_DEBUG: ${NL2SQL_DEBUG:-false}
+      NL2SQL_EXPOSE_METRICS: ${NL2SQL_EXPOSE_METRICS:-true}
+    depends_on:
+      postgres_olap:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8060/health', timeout=3)\"",
+        ]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - dataops_net
+
   portal_web:
     build:
       context: .
@@ -774,12 +938,11 @@ services:
       - "${INGRESS_PORT:-8090}:80"
     volumes:
       - ./infra/ingress/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./dbt/target:/var/www/dbt:ro
     depends_on:
       portal_web:
         condition: service_healthy
       airflow_webserver:
-        condition: service_healthy
-      dbt_web_backend:
         condition: service_healthy
       mlflow:
         condition: service_healthy
@@ -798,6 +961,16 @@ services:
       spark_worker:
         condition: service_healthy
       minio:
+        condition: service_healthy
+      schema_registry:
+        condition: service_healthy
+      debezium_connect:
+        condition: service_healthy
+      atlas_server:
+        condition: service_started
+      node_red:
+        condition: service_healthy
+      nl2sql_app:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1/ || exit 1"]
@@ -825,3 +998,4 @@ volumes:
   jupyterhub_data:
   prometheus_data:
   grafana_data:
+  node_red_data:

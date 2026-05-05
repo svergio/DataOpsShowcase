@@ -7,8 +7,7 @@
 | Путь | Роль |
 |------|------|
 | `pipelines/` | Airflow: DAG, плагины, `datasets` |
-| `services/` | Общий Python: хранилища, Kafka, логи, метрики; **dbt-web** — веб-UI |
-| `services/dbt_web/` | **Flask**: JSON API + Jinja-шаблоны + статика (CSS/JS, lineage на D3). Отдельного Node-фронтенда в compose нет. |
+| `services/` | Общий Python: хранилища, Kafka, логи, метрики; **dbt-rest** — запуск dbt по HTTP |
 | `spark/jobs/` | Точки входа Spark-задач |
 | `spark/common/` | Утилиты (`lib_runtime`, `spark_session`), подключаются в job как `py_files` |
 | `ml/training/` | Скрипты обучения (например, `train_order_value_model.py`) |
@@ -24,10 +23,10 @@
 
 ## Интеграция в рантайме (Docker)
 
-- `docker compose` поднимает, среди прочего: PostgreSQL (роли OLTP/OLAP/meta), Kafka, MinIO, Spark, Airflow, MLflow, **dbt-web**, Prometheus, **ingress (nginx)**.
+- `docker compose` поднимает, среди прочего: PostgreSQL (роли OLTP/OLAP/meta), Kafka, MinIO, Spark, Airflow, MLflow, Prometheus, **ingress (nginx)**.
 - В **Airflow** смонтированы `pipelines/`, `services/`, `spark/`, `ml/`, `generators/`, `configs/`, `dbt/`.
 - **Spark** workers получают `spark/jobs` и `spark/conf`; `py_files` — общий runtime из `spark/common/`.
-- **dbt-web** обслуживает UI по префиксу `/dbt` и API `/api/v1` за ingress (см. [WEB_UI_ACCESS.md](WEB_UI_ACCESS.md), [API.md](API.md)).
+- **dbt Docs** по префиксу **`/dbt/`**: nginx отдаёт статику из смонтированного **`dbt/target/`** (после `dbt docs generate`). Запуск dbt — **Airflow** и **`dbt-rest`** (см. [WEB_UI_ACCESS.md](WEB_UI_ACCESS.md), [API.md](API.md)).
 - **Наблюдаемость**: JSON-логи, метрики Prometheus, дашборды Grafana — конфиги в [`infra/monitoring/`](../infra/monitoring/); см. также [OBSERVABILITY_AND_LOGGING.md](OBSERVABILITY_AND_LOGGING.md) и [TESTING_AND_DATA_QUALITY.md](TESTING_AND_DATA_QUALITY.md) (отличие от dbt DQ).
 
 ## Поток данных (логически)

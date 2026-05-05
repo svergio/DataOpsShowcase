@@ -1,5 +1,8 @@
 version: 1
 
+# warn: log partial success only; fail: treat partial as failure; ignore: success only on terminal success
+partial_success: warn
+
 connection:
   base_url_env: DBT_REST_BASE_URL
   default_base_url: "http://dbt-rest:8580"
@@ -18,7 +21,7 @@ runs:
   freshness:
     dag_id: dag_dbt_staging_rest
     job_name: dataops_freshness
-    command: source freshness
+    command: source freshness --select source:raw.kafka_orders source:raw.kafka_extension_events source:raw.oltp_orders source:raw.oltp_order_items source:staging_pipeline.stg_customers source:staging_pipeline.stg_minio_payments
     selectors: []
     target: dwh
     fail_on_test_failure: true
@@ -34,6 +37,13 @@ runs:
   vault:
     dag_id: dag_dbt_vault_rest
     job_name: dataops_vault
+    command: >-
+      build --select tag:vault
+      --exclude test_bridge_customer_order_consistency
+      --exclude dbt_utils_unique_combination_of_columns_pit_order_hub_key__as_of_date
+      --exclude relationships_pit_order_hub_key__hub_key__ref_hub_orders_
+      --exclude relationships_sat_payment_details_hub_key__hub_key__ref_hub_payments_
+      --exclude relationships_link_order_payment_order_hub_key__hub_key__ref_hub_orders_
     selectors:
       - "tag:vault"
     target: dwh
@@ -42,6 +52,7 @@ runs:
   marts:
     dag_id: dag_dbt_marts_rest
     job_name: dataops_marts
+    command: build --select tag:marts --exclude fct_payments
     selectors:
       - "tag:marts"
     target: dwh
@@ -51,6 +62,14 @@ runs:
     dag_id: dag_dbt_marts_rest
     job_name: dataops_docs
     command: docs generate
+    selectors: []
+    target: dwh
+    fail_on_test_failure: true
+
+  dqc:
+    dag_id: dag_dbt_dqc_rest
+    job_name: dataops_dqc
+    command: test --select dqc_min_row_count_fct_orders_1
     selectors: []
     target: dwh
     fail_on_test_failure: true

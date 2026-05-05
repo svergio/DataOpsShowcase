@@ -1,0 +1,56 @@
+{
+  "editable": true,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Pipeline Runs by Status",
+      "datasource": { "type": "postgres", "uid": "PGDWH" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "format": "time_series",
+          "rawSql": "SELECT started_at AS time, status AS metric, COUNT(*)::double precision AS value FROM meta.pipeline_runs WHERE started_at >= NOW() - INTERVAL '24 hour' GROUP BY 1,2 ORDER BY 1;",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "table",
+      "title": "Latest Watermarks",
+      "datasource": { "type": "postgres", "uid": "PGDWH" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "format": "table",
+          "rawSql": "SELECT pipeline_name, watermark_value, last_run_at, records_processed FROM meta.pipeline_watermarks ORDER BY last_run_at DESC LIMIT 50;",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "dbt Task Duration (seconds)",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum by (dag_id) (rate(task_duration_seconds_sum{dag_id=~\"dag_dbt_.*\"}[5m]))",
+          "legendFormat": "{{dag_id}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["dwh", "dbt", "telemetry"],
+  "templating": { "list": [] },
+  "time": { "from": "now-24h", "to": "now" },
+  "title": "DWH + dbt Telemetry",
+  "uid": "dwh-dbt-telemetry",
+  "version": 1
+}

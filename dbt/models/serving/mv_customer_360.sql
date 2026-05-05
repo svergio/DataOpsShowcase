@@ -10,14 +10,14 @@
     ]
 ) }}
 
-{# Customer 360 — full denormalised view per customer for BI dashboards.
-   Combines dim_customers, fct_orders aggregations and fct_payments aggregations. #}
+{# Customer 360 — denormalised; customer attributes are masked / hashed only. #}
 WITH cust AS (
     SELECT
         customer_hub_key,
         customer_bk,
-        email,
-        full_name,
+        customer_hash,
+        masked_email,
+        masked_name,
         registered_at,
         email_domain,
         is_email_valid,
@@ -55,8 +55,9 @@ payment_summary AS (
 SELECT
     c.customer_hub_key,
     c.customer_bk,
-    c.email,
-    c.full_name,
+    c.customer_hash,
+    c.masked_email,
+    c.masked_name,
     c.registered_at,
     c.email_domain,
     c.is_email_valid,
@@ -65,7 +66,7 @@ SELECT
     c.order_count_90d,
     COALESCE(os.lifetime_orders, 0)         AS lifetime_orders,
     COALESCE(os.lifetime_gross, 0)          AS lifetime_gross,
-    COALESCE(os.lifetime_paid, 0)           AS lifetime_paid,
+    COALESCE(os.lifetime_paid, 0)          AS lifetime_paid,
     os.lifetime_aov                         AS lifetime_aov,
     os.last_order_ts                        AS last_order_ts,
     os.first_order_ts                       AS first_order_ts,

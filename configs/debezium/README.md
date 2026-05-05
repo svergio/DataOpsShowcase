@@ -1,6 +1,6 @@
 # Debezium connectors (PostgreSQL)
 
-Prerequisites: базовый стек, `infra/cdc/docker-compose.cdc.yml`, WAL на Postgres (см. [`docs/ARCHITECTURE_CDC.md`](../../docs/ARCHITECTURE_CDC.md)), bootstrap в [`services/postgres/cdc`](../../services/postgres/cdc).
+Prerequisites: корневой `docker compose up -d` (включая `schema_registry` и `debezium_connect`), WAL на Postgres (см. [`docs/ARCHITECTURE_CDC.md`](../../docs/ARCHITECTURE_CDC.md)), bootstrap в [`services/postgres/cdc`](../../services/postgres/cdc).
 
 Пароли в JSON должны совпадать с `DEBEZIUM_*` в `.env`.
 

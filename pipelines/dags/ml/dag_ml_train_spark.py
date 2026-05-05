@@ -4,30 +4,25 @@ import os
 from datetime import datetime, timezone
 
 from airflow.decorators import dag, task
-from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 
+from pipelines.utils.airflow_callbacks import task_failure_callback, task_success_callback
 from pipelines.utils.dag_factory import default_args
 from pipelines.utils.datasets import DS_DBT_MARTS_DONE, DS_ML_TRAIN_DONE
-
+from pipelines.utils.spark_submit_factory import build_spark_submit_operator
 
 DAG_ID = "dag_ml_train_spark"
 SOURCE = "spark.ml.training"
-SPARK_APPLICATION = "/opt/airflow/ml/training/train_order_value_model.py"
-SPARK_PY_FILES = (
-    "/opt/airflow/spark/common/lib_runtime.py,"
-    "/opt/airflow/spark/common/spark_session.py"
-)
 
 
 @dag(
     dag_id=DAG_ID,
-    description="Spark ML training with MLflow tracking and model registry",
+    description="Spark ML training from staging orders only (no raw PII); MLflow registry",
     schedule=[DS_DBT_MARTS_DONE],
     start_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
     catchup=False,
     max_active_runs=1,
     default_args=default_args({"retries": 2}),
-    tags=["ml", "spark", "mlflow"],
+    tags=["ml", "spark", "mlflow", "privacy"],
 )
 def ml_train_spark() -> None:
     @task
@@ -57,19 +52,15 @@ def ml_train_spark() -> None:
                         THEN (SELECT COUNT(*)::bigint FROM staging.stg_orders)
                         ELSE 0::bigint
                     END AS stg_cnt
-                    ,
-                    CASE
-                        WHEN to_regclass('raw.oltp_orders') IS NOT NULL
-                        THEN (SELECT COUNT(*)::bigint FROM raw.oltp_orders)
-                        ELSE 0::bigint
-                    END AS raw_cnt
                 )
-                SELECT dwh_cnt + stg_cnt + raw_cnt FROM cnt
+                SELECT dwh_cnt + stg_cnt FROM cnt
                 """,
             )
             stg_orders_cnt = int(row[0]) if row else 0
             if stg_orders_cnt == 0:
-                raise ValueError("No rows in dwh_staging.stg_orders, staging.stg_orders, raw.oltp_orders")
+                raise ValueError(
+                    "No rows in dwh_staging.stg_orders or staging.stg_orders — run Spark preprocess first"
+                )
             payload = {"stg_orders_count": stg_orders_cnt}
             get_logger(DAG_ID).info("ml precheck passed", extra={"extra_payload": payload})
             finish_run(run_meta, status="success", rows_in=stg_orders_cnt, payload=payload)
@@ -78,15 +69,14 @@ def ml_train_spark() -> None:
             finish_run(run_meta, status="failed", error_message=str(exc))
             raise
 
-    train = SparkSubmitOperator(
+    train = build_spark_submit_operator(
+        job_id="ml_train_order_value",
         task_id="spark_train_model",
-        application=SPARK_APPLICATION,
-        py_files=SPARK_PY_FILES,
-        conn_id="spark_default",
-        name="dataops_ml_train_order_value",
         application_args=[
             "--execution-ts",
             "{{ data_interval_end | default(ts) }}",
+            "--env",
+            "{{ var.value.get('SPARK_JOB_ENV', 'production') }}",
             "--lookback-days",
             "60",
             "--train-ratio",
@@ -109,18 +99,17 @@ def ml_train_spark() -> None:
             "AWS_DEFAULT_REGION": os.environ.get("AWS_DEFAULT_REGION", "us-east-1"),
         },
         conf={
-            "spark.jars.packages": "org.postgresql:postgresql:42.7.3",
             "spark.executorEnv.MLFLOW_TRACKING_URI": os.environ.get("MLFLOW_TRACKING_URI", "http://mlflow:5000"),
-            "spark.executorEnv.MLFLOW_S3_ENDPOINT_URL": os.environ.get("MLFLOW_S3_ENDPOINT_URL", "http://minio:9000"),
+            "spark.executorEnv.MLFLOW_S3_ENDPOINT_URL": os.environ.get(
+                "MLFLOW_S3_ENDPOINT_URL", "http://minio:9000"
+            ),
             "spark.executorEnv.AWS_ACCESS_KEY_ID": os.environ.get("MINIO_ROOT_USER", "minio"),
             "spark.executorEnv.AWS_SECRET_ACCESS_KEY": os.environ.get("MINIO_ROOT_PASSWORD", "minio123"),
             "spark.executorEnv.AWS_DEFAULT_REGION": os.environ.get("AWS_DEFAULT_REGION", "us-east-1"),
         },
+        on_failure_callback=task_failure_callback,
+        on_success_callback=task_success_callback,
         retries=2,
-        executor_cores=2,
-        executor_memory="2g",
-        driver_memory="2g",
-        num_executors=1,
     )
 
     @task(outlets=[DS_ML_TRAIN_DONE])

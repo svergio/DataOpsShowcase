@@ -191,7 +191,24 @@ class MicroBatchKafkaConsumer:
         if not offsets or not self._consumer:
             return
         partitions = [TopicPartition(self.topic, int(p), int(o) + 1) for p, o in offsets.items()]
-        self._consumer.commit(offsets=partitions, asynchronous=False)
+        self._consumer.poll(0.0)
+        try:
+            self._consumer.commit(offsets=partitions, asynchronous=False)
+        except KafkaException as exc:
+            err = exc.args[0] if exc.args else None
+            if err is not None and err.code() == KafkaError.ILLEGAL_GENERATION:
+                logger.warning(
+                    "kafka commit skipped after illegal generation",
+                    extra={
+                        "extra_payload": {
+                            "topic": self.topic,
+                            "group_id": self.group_id,
+                            "offsets": offsets,
+                        }
+                    },
+                )
+                return
+            raise
         logger.info(
             "kafka offsets committed",
             extra={"extra_payload": {"topic": self.topic, "offsets": offsets}},

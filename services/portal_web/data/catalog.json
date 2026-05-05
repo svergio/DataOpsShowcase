@@ -1,12 +1,7 @@
 {
   "version": 1,
   "init_containers": ["airflow_init", "superset_init"],
-  "optional_graph_containers": [
-    "atlas_server",
-    "schema_registry",
-    "debezium_connect",
-    "data_generator"
-  ],
+  "optional_graph_containers": ["data_generator"],
   "web_ui_services": [
     {
       "id": "airflow",
@@ -17,12 +12,12 @@
       "probe_url": "http://airflow_webserver:8080/health"
     },
     {
-      "id": "dbt-ui",
-      "name": "dbt Web (UI)",
+      "id": "dbt-docs",
+      "name": "dbt Docs",
       "route": "/dbt/",
-      "purpose": "Оболочка над артефактами dbt: прогоны, тесты, lineage, документация (docs/WEB_UI_ACCESS.md).",
-      "container": "dbt-web-backend",
-      "probe_url": "http://dbt-web-backend:8010/api/v1/health"
+      "purpose": "Статический сайт из `dbt docs generate` (артефакты в `dbt/target/`, отдаёт ingress). Нужен успешный прогон DAG с docs.",
+      "container": "dataops_ingress",
+      "probe_url": "http://dataops_ingress/dbt/"
     },
     {
       "id": "mlflow",
@@ -46,7 +41,7 @@
       "route": "/superset/",
       "purpose": "BI и SQL над витринами OLAP (см. docs/SUPERSET.md).",
       "container": "superset",
-      "probe_url": "http://superset:8088/health"
+      "probe_url": "http://superset:8088/superset/health"
     },
     {
       "id": "jupyter",
@@ -55,6 +50,22 @@
       "purpose": "Ноутбуки в сети стека; base_url=/jupyter/ (docs/WEB_UI_ACCESS.md).",
       "container": "jupyterhub",
       "probe_url": "http://jupyterhub:8888/jupyter/"
+    },
+    {
+      "id": "node-red",
+      "name": "Node-RED",
+      "route": "/node-red/",
+      "purpose": "Low-code потоки и HTTP-интеграции; UI и ноды под префиксом /node-red/ (логин в .env: NODE_RED_ADMIN_*).",
+      "container": "node_red",
+      "probe_url": "http://node_red:1880/node-red/"
+    },
+    {
+      "id": "nl2sql-app",
+      "name": "NL2SQL HR",
+      "route": "/nl2sql/",
+      "purpose": "Чат-интерфейс NL2SQL для HR-данных DWH (RAG + локальная Qwen через MLflow pyfunc).",
+      "container": "nl2sql_app",
+      "probe_url": "http://nl2sql_app:8060/health"
     },
     {
       "id": "prometheus",
@@ -100,7 +111,7 @@
       "id": "atlas",
       "name": "Apache Atlas",
       "route": "/atlas/",
-      "purpose": "Метаданные и lineage: веб-UI и API (опциональный overlay infra/metadata/atlas).",
+      "purpose": "Метаданные и lineage: веб-UI и API за ingress (основной compose). Первый старт может занять много минут.",
       "container": "atlas_server",
       "probe_url": "http://atlas_server:21000/"
     }
@@ -129,43 +140,21 @@
       "kind": "ingress_api"
     },
     {
-      "id": "dbt-api-ingress",
-      "name": "dbt-web JSON API (через ingress)",
-      "route": "/dbt-api/v1/",
-      "purpose": "JSON API dbt-web через ingress: прогоны, модели, тесты, lineage.",
-      "checklist_what": "JSON API dbt-web: прогоны, модели, тесты, lineage.",
-      "checklist_how": "с хоста /dbt-api/v1/, внутри dbt-web-backend:8010.",
-      "container": "dbt-web-backend",
-      "probe_url": "http://dbt-web-backend:8010/api/v1/health",
-      "kind": "ingress_api"
-    },
-    {
-      "id": "dbt-api-raw",
-      "name": "dbt-web API (прямой контейнер)",
-      "route": "",
-      "purpose": "Внутренний JSON API dbt-web в compose (порт на хост не публикуется).",
-      "checklist_what": "Тот же JSON API dbt-web, но без ingress.",
-      "checklist_how": "внутри compose: dbt-web-backend:8010/api/v1/.",
-      "container": "dbt-web-backend",
-      "probe_url": "http://dbt-web-backend:8010/api/v1/health",
-      "kind": "internal_only"
-    },
-    {
-      "id": "nginx-api-prefix",
-      "name": "Префикс /api/ у ingress",
-      "route": "/api/",
-      "purpose": "Альтернативный ingress-префикс к тому же backend dbt-web.",
-      "checklist_what": "Альтернативный ingress-префикс к dbt-web API.",
-      "checklist_how": "с хоста /api/, внутри dbt-web-backend:8010.",
-      "container": "dbt-web-backend",
-      "probe_url": "http://dbt-web-backend:8010/api/v1/health",
+      "id": "airflow-api",
+      "name": "Airflow REST API v1",
+      "route": "/airflow/api/v1/",
+      "purpose": "Открытое HTTP API: DAG runs, задачи, OpenAPI. За ingress тот же префикс /airflow/, что и UI. Basic-auth или сессия по политике RBAC Airflow.",
+      "checklist_what": "REST v1 (например /airflow/api/v1/version, openapi).",
+      "checklist_how": "с хоста по INGRESS_BASE_URL + /airflow/api/v1/; внутри airflow_webserver:8080/airflow/api/v1/.",
+      "container": "airflow_webserver",
+      "probe_url": "http://airflow_webserver:8080/airflow/health",
       "kind": "ingress_api"
     },
     {
       "id": "dbt-rest",
       "name": "dbt REST (FastAPI, запуск dbt)",
       "route": "",
-      "purpose": "Запуск dbt-run'ов (POST /runs, /jobs/run/*), плюс статус, логи и артефакты.",
+      "purpose": "Запуск dbt-run'ов (POST /runs, /jobs/run/*), плюс статус, логи и артефакты. Публичного JSON API для метаданных dbt через ingress нет.",
       "checklist_what": "Сервис запуска dbt-run'ов и выдачи статуса/логов.",
       "checklist_how": "внутри compose: dbt-rest:8580 (POST /runs, GET /runs/{id}).",
       "container": "dbt-rest",
@@ -227,7 +216,6 @@
     {"id": "spark_master", "label_ru": "Spark Master", "container": "spark_master", "shape_kind": "compute", "group": 2, "is_init": false},
     {"id": "spark_worker", "label_ru": "Spark Worker", "container": "spark_worker", "shape_kind": "compute", "group": 2, "is_init": false},
     {"id": "dbt", "label_ru": "dbt (CLI)", "container": "dbt", "shape_kind": "batch", "group": 2, "is_init": false},
-    {"id": "dbt-web-backend", "label_ru": "dbt Web/API", "container": "dbt-web-backend", "shape_kind": "web_app", "group": 2, "is_init": false},
     {"id": "dbt_rest", "label_ru": "dbt REST", "container": "dbt-rest", "shape_kind": "batch", "group": 2, "is_init": false},
     {"id": "postgres_oltp", "label_ru": "PostgreSQL OLTP", "container": "postgres_oltp", "shape_kind": "db", "group": 3, "is_init": false},
     {"id": "postgres_olap", "label_ru": "PostgreSQL OLAP", "container": "postgres_olap", "shape_kind": "db", "group": 3, "is_init": false},
@@ -242,13 +230,16 @@
     {"id": "superset", "label_ru": "Superset", "container": "superset", "shape_kind": "web_app", "group": 4, "is_init": false},
     {"id": "superset_init", "label_ru": "Superset init", "container": "superset_init", "shape_kind": "batch", "group": 4, "is_init": true},
     {"id": "jupyterhub", "label_ru": "Jupyter", "container": "jupyterhub", "shape_kind": "web_app", "group": 4, "is_init": false},
-    {"id": "atlas_server", "label_ru": "Atlas (opt.)", "container": "atlas_server", "shape_kind": "web_app", "group": 5, "is_init": false, "optional": true},
-    {"id": "schema_registry", "label_ru": "Schema Reg. (opt.)", "container": "schema_registry", "shape_kind": "broker", "group": 5, "is_init": false, "optional": true},
-    {"id": "debezium_connect", "label_ru": "Debezium (opt.)", "container": "debezium_connect", "shape_kind": "compute", "group": 5, "is_init": false, "optional": true},
+    {"id": "atlas_server", "label_ru": "Apache Atlas", "container": "atlas_server", "shape_kind": "web_app", "group": 5, "is_init": false},
+    {"id": "schema_registry", "label_ru": "Schema Registry", "container": "schema_registry", "shape_kind": "broker", "group": 5, "is_init": false},
+    {"id": "debezium_connect", "label_ru": "Debezium Connect", "container": "debezium_connect", "shape_kind": "compute", "group": 5, "is_init": false},
+    {"id": "node_red", "label_ru": "Node-RED", "container": "node_red", "shape_kind": "web_app", "group": 5, "is_init": false},
+    {"id": "nl2sql_app", "label_ru": "NL2SQL HR", "container": "nl2sql_app", "shape_kind": "web_app", "group": 5, "is_init": false},
     {"id": "data_generator", "label_ru": "Генератор (opt.)", "container": "data_generator", "shape_kind": "batch", "group": 5, "is_init": false, "optional": true}
   ],
   "graph_links": [
     ["dataops_ingress", "portal_web"],
+    ["dataops_ingress", "node_red"],
     ["dataops_ingress", "airflow_webserver"],
     ["airflow_webserver", "airflow_scheduler"],
     ["airflow_webserver", "airflow_triggerer"],
@@ -256,13 +247,12 @@
     ["spark_master", "spark_worker"],
     ["airflow_webserver", "dbt_rest"],
     ["airflow_webserver", "dbt"],
-    ["dbt-web-backend", "dbt_rest"],
+    ["dataops_ingress", "dbt_rest"],
+    ["dataops_ingress", "dbt"],
     ["airflow_webserver", "kafka"],
     ["airflow_webserver", "postgres_oltp"],
     ["dbt", "postgres_olap"],
-    ["dbt-web-backend", "postgres_olap"],
     ["dbt", "minio"],
-    ["dbt-web-backend", "minio"],
     ["superset", "postgres_olap"],
     ["grafana", "prometheus"],
     ["prometheus", "pushgateway"],
@@ -270,5 +260,8 @@
     ["kafka", "schema_registry"],
     ["debezium_connect", "kafka"],
     ["debezium_connect", "schema_registry"]
+    ,["dataops_ingress", "nl2sql_app"]
+    ,["nl2sql_app", "postgres_olap"]
+    ,["nl2sql_app", "mlflow"]
   ]
 }

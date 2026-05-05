@@ -5,6 +5,9 @@ models:
     description: "Materialized view: full customer 360 (lifetime + 90d metrics) for BI."
     config:
       tags: ['serving', 'customer_360']
+    tests:
+      - dqc_min_row_count:
+          min_count: 1
     columns:
       - name: customer_hub_key
         tests: [not_null, unique]
@@ -17,9 +20,13 @@ models:
               config:
                 where: "customer_segment is not null"
       - name: lifetime_orders
-        tests: [not_null]
+        tests:
+          - not_null
+          - dqc_non_negative_column: {}
       - name: lifetime_gross
-        tests: [not_null]
+        tests:
+          - not_null
+          - dqc_non_negative_column: {}
 
   - name: agg_daily_sales
     description: "Pre-aggregated daily sales with rolling 7d / 30d MAs and WoW growth."
@@ -31,7 +38,11 @@ models:
       - name: currency
         tests: [not_null]
       - name: order_count
+        tests:
+          - dqc_non_negative_column: {}
       - name: gross_sales
+        tests:
+          - dqc_non_negative_column: {}
     tests:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns: ['order_date', 'currency']
@@ -44,6 +55,8 @@ models:
       - name: payment_date
         tests: [not_null]
       - name: payment_method
+        tests: [not_null]
+      - name: currency
         tests: [not_null]
       - name: success_rate
     tests:
@@ -60,6 +73,9 @@ models:
       - name: customer_segment
         tests: [not_null]
       - name: gross_sales
+        tests:
+          - not_null
+          - dqc_non_negative_column: {}
     tests:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns: ['order_date', 'customer_segment']

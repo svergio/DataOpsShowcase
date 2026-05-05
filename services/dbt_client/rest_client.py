@@ -45,6 +45,23 @@ class DbtRunResult:
     finished_at: str | None
     artifacts_url: str | None
     raw: dict[str, Any]
+    partial: bool = False
+
+
+def _partial_from_payload(data: dict[str, Any]) -> bool:
+    if bool(data.get("partial_success")):
+        return True
+    detail = str(data.get("status_detail") or "").lower()
+    if "partial" in detail:
+        return True
+    rr = data.get("run_results") or data.get("results")
+    if isinstance(rr, dict):
+        failed = rr.get("failed") or rr.get("failures")
+        if isinstance(failed, int) and failed > 0:
+            return True
+        if isinstance(failed, list) and len(failed) > 0:
+            return True
+    return False
 
 
 class DbtRestClient:
@@ -60,6 +77,7 @@ class DbtRestClient:
         trigger_backoff_factor: float = 2.0,
         poll_interval_seconds: float = 20.0,
         poll_max_total_seconds: float = 7200.0,
+        partial_success: str = "ignore",
     ) -> None:
         self.base_url = (base_url or os.environ.get("DBT_REST_BASE_URL", "")).rstrip("/")
         if not self.base_url:
@@ -72,6 +90,7 @@ class DbtRestClient:
         self.trigger_backoff_factor = trigger_backoff_factor
         self.poll_interval_seconds = poll_interval_seconds
         self.poll_max_total_seconds = poll_max_total_seconds
+        self.partial_success = str(partial_success or "ignore").strip().lower()
 
     def _headers(self) -> dict[str, str]:
         headers = {
@@ -179,6 +198,7 @@ class DbtRestClient:
                 extra={"extra_payload": {"run_id": run_id, "status": status}},
             )
             if status in TERMINAL_STATES:
+                partial = status in SUCCESS_STATES and _partial_from_payload(data)
                 result = DbtRunResult(
                     run_id=run_id,
                     status=status,
@@ -186,9 +206,20 @@ class DbtRestClient:
                     finished_at=data.get("finished_at"),
                     artifacts_url=data.get("artifacts_url"),
                     raw=data,
+                    partial=partial,
                 )
                 if status not in SUCCESS_STATES:
                     raise DbtRunFailed(run_id, status, data)
+                if partial:
+                    if self.partial_success == "fail":
+                        raise DbtRestError(
+                            f"dbt run {run_id} reported partial success but partial_success policy is fail"
+                        )
+                    if self.partial_success == "warn":
+                        logger.warning(
+                            "dbt run succeeded with partial failures (per API payload)",
+                            extra={"extra_payload": {"run_id": run_id}},
+                        )
                 return result
             if time.monotonic() > deadline:
                 raise DbtRestError(
@@ -216,8 +247,13 @@ class DbtRestClient:
             raise
 
 
-def build_client_from_config(rest_cfg: dict[str, Any], retry_cfg: dict[str, Any]) -> DbtRestClient:
+def build_client_from_config(
+    rest_cfg: dict[str, Any],
+    retry_cfg: dict[str, Any],
+    root_cfg: dict[str, Any] | None = None,
+) -> DbtRestClient:
     connection = rest_cfg or {}
+    root = root_cfg or {}
     base_url = os.environ.get(connection.get("base_url_env", "DBT_REST_BASE_URL"))
     if not base_url:
         base_url = connection.get("default_base_url", "")
@@ -232,4 +268,5 @@ def build_client_from_config(rest_cfg: dict[str, Any], retry_cfg: dict[str, Any]
         trigger_backoff_factor=float(retry_cfg.get("trigger_backoff_factor", 2.0)),
         poll_interval_seconds=float(retry_cfg.get("poll_interval_seconds", 20.0)),
         poll_max_total_seconds=float(retry_cfg.get("poll_max_total_seconds", 7200.0)),
+        partial_success=str(root.get("partial_success", "ignore")),
     )

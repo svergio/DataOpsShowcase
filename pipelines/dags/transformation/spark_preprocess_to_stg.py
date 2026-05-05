@@ -4,41 +4,39 @@ import os
 from datetime import datetime, timedelta, timezone
 
 from airflow.decorators import dag, task
-from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 
+from pipelines.utils.airflow_callbacks import task_failure_callback, task_success_callback
 from pipelines.utils.dag_factory import default_args
-from pipelines.utils.datasets import (
-    DS_RAW_KAFKA_ORDERS,
-    DS_RAW_KAFKA_PAYMENTS,
-    DS_RAW_MINIO_FILES,
-    DS_RAW_OLTP,
-    DS_STG_CLEAN,
-)
+from pipelines.utils.datasets import DS_STG_CLEAN
+from pipelines.utils.spark_schedule import raw_four_tuple, spark_preprocess_schedule
+from pipelines.utils.spark_submit_factory import build_spark_submit_operator
 
 DAG_ID = "dag_spark_preprocess_to_stg"
 SOURCE = "spark.preprocess"
 
-SPARK_APPLICATION = "/opt/airflow/spark/jobs/preprocess_orders_payments.py"
-SPARK_PY_FILES = (
-    "/opt/airflow/spark/common/lib_runtime.py,"
-    "/opt/airflow/spark/common/spark_session.py"
-)
+DAG_DOC = """
+### Spark: raw to anonymized staging
+
+**Privacy:** `staging.stg_*` has **no open PII** (no raw email, full name, phone). Salt: env `SPARK_PRIVACY_SALT` (required for `SPARK_JOB_ENV=production`).
+
+**Schedule:** Airflow Variable `spark_preprocess_mode`:
+- `all_raw` (default): **AND** on all four raw datasets (OLTP, Kafka orders/payments, MinIO).
+- `any_raw`: **OR** (dev/testing; incomplete slices possible — see precheck/validate logs).
+
+Runbook: `docs/runbook/AIRFLOW_DAG_TROUBLESHOOTING.md` in the repo.
+"""
 
 
 @dag(
     dag_id=DAG_ID,
-    description="Spark preprocessing: cleaning, dedup, schema enforcement, de-anonymization (raw -> stg)",
-    schedule=(
-        DS_RAW_OLTP
-        | DS_RAW_KAFKA_ORDERS
-        | DS_RAW_KAFKA_PAYMENTS
-        | DS_RAW_MINIO_FILES
-    ),
+    description="Spark preprocessing: raw -> staging with anonymization (hash + masked fields)",
+    schedule=spark_preprocess_schedule(),
     start_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
     catchup=False,
     max_active_runs=1,
     default_args=default_args(),
-    tags=["transformation", "spark", "preprocessing"],
+    tags=["transformation", "spark", "preprocessing", "privacy"],
+    doc_md=DAG_DOC,
 )
 def spark_preprocess_to_stg() -> None:
     @task
@@ -78,36 +76,29 @@ def spark_preprocess_to_stg() -> None:
             finish_run(run_meta, status="failed", error_message=str(exc))
             raise
 
-    spark_job = SparkSubmitOperator(
+    raw_datasets = list(raw_four_tuple())
+    spark_job = build_spark_submit_operator(
+        job_id="preprocess_orders_payments",
         task_id="spark_preprocess",
-        application=SPARK_APPLICATION,
-        py_files=SPARK_PY_FILES,
-        conn_id="spark_default",
-        name="dataops_preprocess_orders_payments",
-        verbose=False,
         application_args=[
             "--execution-ts",
             "{{ (data_interval_end or logical_date).isoformat() }}",
             "--lookback-hours",
-            "{{ var.value.SPARK_PREPROCESS_LOOKBACK_HOURS | default(2) }}",
+            "{{ var.value.get('SPARK_PREPROCESS_LOOKBACK_HOURS', 2) }}",
+            "--env",
+            "{{ var.value.get('SPARK_JOB_ENV', 'production') }}",
         ],
         env_vars={
             "DWH_JDBC_URL": os.environ.get(
                 "DWH_JDBC_URL",
-                "jdbc:postgresql://postgres-dwh:5432/dataops_dwh",
+                "jdbc:postgresql://postgres_olap:5432/techmart_dwh",
             ),
-            "DWH_JDBC_USER": "{{ var.value.DWH_JDBC_USER | default('dataops') }}",
-            "DWH_JDBC_PASSWORD": "{{ var.value.DWH_JDBC_PASSWORD | default('dataops') }}",
+            "DWH_JDBC_USER": "{{ var.value.get('DWH_JDBC_USER', 'olap_user') }}",
+            "DWH_JDBC_PASSWORD": "{{ var.value.get('DWH_JDBC_PASSWORD', 'olap_pass') }}",
         },
-        conf={
-            "spark.jars.packages": "org.postgresql:postgresql:42.7.3",
-        },
-        retries=3,
-        retry_delay=timedelta(minutes=5),
-        executor_cores=2,
-        executor_memory="1g",
-        driver_memory="1g",
-        num_executors=1,
+        on_failure_callback=task_failure_callback,
+        on_success_callback=task_success_callback,
+        inlets=raw_datasets,
     )
 
     @task

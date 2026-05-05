@@ -1,0 +1,16 @@
+artifact_path: nl2sql_qwen
+flavors:
+  python_function:
+    cloudpickle_version: 3.0.0
+    env:
+      conda: conda.yaml
+    loader_module: mlflow.pyfunc.model
+    model_config:
+      max_new_tokens: 256
+      model_id: Qwen/Qwen2.5-3B-Instruct
+      temperature: 0.0
+    python_model: python_model.pkl
+    python_version: 3.11.9
+mlflow_version: 2.15.1
+model_uuid: nl2sql-qwen-local
+utc_time_created: "2026-05-04 00:00:00.000000"

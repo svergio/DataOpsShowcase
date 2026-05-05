@@ -1,112 +1,36 @@
 # DataOpsShowcase
 
-> **Песочница полного контура Data Platform** в одном монорепозитории: от синтетических источников до витрин, MLflow и дашбордов.
+Демонстрационный **Data Platform** в одном репозитории: от синтетики и Kafka до витрин, MLflow, Grafana и дашбордов. Подходит для **обучения, демо и прототипов** — не как готовый продакшен.
 
-**DataOpsShowcase** эмулирует цепочку, похожую на продуктовую: **OLTP, Kafka, MinIO** → ingestion и **Apache Airflow** → **Apache Spark** → **dbt** (включая **Data Vault 2.0**), витрины, **ML** (Spark + **MLflow**), наблюдаемость (**Prometheus / Grafana**). Сверху — единый **ingress** с порталом `/` (карточки сервисов, live-статусы, граф), **dbt-web** (Flask UI/API) и внутренним **dbt-rest** (FastAPI для запусков dbt).
+## Быстрый старт
 
-Это **учебно-демонстрационный** стенд: можно безопасно экспериментировать, показывать архитектуру **инженерам, аналитикам и бизнесу** ([docs/business/](docs/business/)) — без претензии на промышленную безопасность и масштаб.
+1. Перейти в каталог `DataOpsShowcase/` (рядом с `docker-compose.yml`).
+2. `cp .env.example .env` — при необходимости поправить порты (`INGRESS_PORT`, см. комментарии в `.env`).
+3. `docker compose up -d`
+4. Подождать `healthy` у основных сервисов: `docker compose ps`.
+5. Открыть в браузере **`http://localhost:8090`** (или ваш `INGRESS_PORT` из `.env`).
 
----
+**Важно:** адрес в строке браузера должен совпадать с **`INGRESS_BASE_URL`** в `.env` (схема, хост и порт). Иначе часть UI (например Superset) может вести себя странно — см. [docs/WEB_UI_ACCESS.md](docs/WEB_UI_ACCESS.md).
 
-## Зачем этот репозиторий
+Проверка после подъёма (опционально): из корня проекта `./scripts/ingress_smoke.sh`.
 
-| Для кого | Что даёт |
-|----------|----------|
-| Инженеры data/platform | end-to-end практика: оркестрация, dbt, Spark, Kafka, DWH |
-| Аналитики и data-инженеры | понятный путь «от сырья до marts» и контроль качества |
-| Руководство / продукт | наглядный разговор о стоимости сроков и слоёв — без боевых данных |
-| Учёба и онбординг | единая среда, повторяемые сценарии, документация на русском |
+## Что внутри (кратко)
 
----
+Один **ingress** отдаёт портал `/`, Airflow, dbt Docs, Grafana, Superset, MLflow и остальное по префиксам — без отдельных пробросов веб-портов на хост (кроме MinIO S3 API и при необходимости БД).
 
-## Ключевые компоненты
+| Куда зайти | Зачем |
+|------------|--------|
+| [docs/README.md](docs/README.md) | Оглавление всей документации |
+| [docs/PROJECT_SUMMARY.md](docs/PROJECT_SUMMARY.md) | Сводка стека и потока данных |
+| [docs/SETUP.md](docs/SETUP.md) | Требования, тесты, типичные проблемы |
+| [docs/WEB_UI_ACCESS.md](docs/WEB_UI_ACCESS.md) | Таблица URL, логины, типовые 404/502 |
 
-| Область | В репозитории |
-|--------|---------------|
-| Данные | [generators/](generators/) эмулируют компанию в четыре sink ([docs/Generators.md](docs/Generators.md)); профиль по умолчанию — [configs/generators/company.generator.json](configs/generators/company.generator.json); запуск контейнера `docker compose --profile generators up -d data_generator` (из каталога `DataOpsShowcase/`, где лежит `docker-compose.yml`). При старте генератор может применить [DDL расширений OLTP](services/postgres/init/02b_oltp_marketing_hr_finance.sql), если `OLTP_EXTENSIONS_SQL` задан — см. [docs/SETUP.md](docs/SETUP.md) (старый Docker-том Postgres) |
-| Хранение и витрины | PostgreSQL (схемы dbt: staging, vault, marts) — см. [docs/diagrams/dwh-schemas.md](docs/diagrams/dwh-schemas.md) |
-| Обработка | [spark/](spark/) (jobs, `common/`), [dbt/](dbt/) |
-| Оркестрация | [pipelines/](pipelines/) — Airflow DAG, datasets |
-| ML | [ml/](ml/) — обучение, фичи, вывод, MLflow |
-| Сервисы | [services/](services/) — portal_web, dbt-web, dbt-rest, общий Python |
-| Конфигурация | [configs/](configs/), [infra/](infra/) (ingress, мониторинг) |
-| Тесты и DQ; наблюдаемость | [docs/TESTING_AND_DATA_QUALITY.md](docs/TESTING_AND_DATA_QUALITY.md), [docs/OBSERVABILITY_AND_LOGGING.md](docs/OBSERVABILITY_AND_LOGGING.md), вход: [docs/QUALITY_AND_MONITORING.md](docs/QUALITY_AND_MONITORING.md), `make smoke` |
-| Документация | [docs/](docs/) — архитектура, API, дорожная карта, схемы |
+Код и конфиги: `pipelines/` (Airflow), `dbt/`, `spark/`, `services/` (портал, dbt-rest, nl2sql и др.), `configs/`, `infra/` (nginx, мониторинг).
 
----
+## Документация
 
-## Как развернуть (локально)
+Полный указатель — **[docs/README.md](docs/README.md)**. Отдельно полезны [PIPELINES.md](docs/PIPELINES.md), [SUPERSET.md](docs/SUPERSET.md), [docs/ML.md](docs/ML.md) (в т.ч. **NL2SQL** за `/nl2sql/`), [services/nl2sql_app/README.md](services/nl2sql_app/README.md), [API.md](docs/API.md), материалы для нетехнических читателей — [docs/business/](docs/business/), диаграммы — [docs/diagrams/](docs/diagrams/).
 
-**Требования:** Docker и Docker Compose (V2, команда `docker compose`).  
-Опционально: Python 3.11+ — для [локальных тестов](docs/SETUP.md) и разработки `dbt-web`.
+## Ограничения
 
-### Шаги
-
-1. Клонировать репозиторий и перейти в корень проекта `DataOpsShowcase/` (там лежит `docker-compose.yml`).
-
-2. Подготовить окружение:
-
-   ```bash
-   cp .env.example .env
-   ```
-
-   При необходимости отредактировать `.env` (порты: чаще всего `INGRESS_PORT`, `DBT_WEB_BACKEND_PORT` — см. комментарии в шаблоне).
-
-3. Поднять весь стек в фоне:
-
-   ```bash
-   docker compose up -d
-   ```
-
-4. Подождать, пока контейнеры станут `healthy` (первый старт Airflow/Postgres может занять 1–3 минуты):
-
-   ```bash
-   docker compose ps
-   ```
-
-5. Открыть **единую точку входа** — nginx **ingress** (по умолчанию порт **8090**).
-
-### С чего начать в браузере
-
-База: `http://localhost:8090` (или ваш `http://localhost:${INGRESS_PORT}` из `.env`).
-
-| URL (относительно ingress) | Что смотреть |
-|----------------------------|----------------|
-| `/` | Портал стека: быстрые ссылки, статусы контейнеров, карта зависимостей (конфиг в `services/portal_web/data/catalog.json`) |
-| `/dbt/` | Веб-UI: runs, модели, тесты, lineage (логин: см. [docs/WEB_UI_ACCESS.md](docs/WEB_UI_ACCESS.md)); старый путь `/dbt-web/` редиректится сюда |
-| `/airflow/` | Панель Airflow: DAG, ручной запуск, логи |
-| `/mlflow/` | MLflow: эксперименты и артефакты |
-| `/grafana/` | Grafana: дашборды (логин в `.env`) |
-| `/superset/` | Superset над OLAP (витрины `dwh_marts`; см. [docs/SUPERSET.md](docs/SUPERSET.md)) |
-| `/dbt-api/v1/health` | Проверка, что API dbt-web отвечает за ingress |
-
-**Логины и типичные поломки (404/502):** [docs/WEB_UI_ACCESS.md](docs/WEB_UI_ACCESS.md).  
-**Прямые порты:** для веб-UIs не используются; объектный API MinIO — `localhost:${MINIO_PORT}`.  
-**API и внутренние адреса (`service:port`), включая dbt-rest:** [docs/API.md](docs/API.md).
-
----
-
-## Документация (навигация)
-
-| Документ | Содержание |
-|----------|------------|
-| [docs/PROJECT_SUMMARY.md](docs/PROJECT_SUMMARY.md) | Сводка: стек, поток данных |
-| [docs/SETUP.md](docs/SETUP.md) | Подробный запуск, тесты, CI |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Монорепо и интеграция сервисов |
-| [docs/PIPELINES.md](docs/PIPELINES.md) | DAG и цепочка datasets |
-| [docs/Roadmap.md](docs/Roadmap.md) | Дорожная карта: ETL/ML, приоритеты |
-| [docs/Generators.md](docs/Generators.md) | Синтетика и источники |
-| [services/portal_web/README.md](services/portal_web/README.md) | Конфиг портала, формат `catalog.json`, валидация |
-| [docs/business/](docs/business/) | Тексты для нетехнических читателей |
-| [docs/business/platform_value.md](docs/business/platform_value.md) | Бизнес-смысл портала/каталога и канал инвестору |
-| [docs/diagrams/](docs/diagrams/) | C4 контейнеров, схемы DWH, OLTP, Kafka, MinIO, Data Vault |
-| [docs/SUPERSET.md](docs/SUPERSET.md) | Superset: Postgres meta + DWH OLAP, bootstrap дашбордов |
-| [docs/TESTING_AND_DATA_QUALITY.md](docs/TESTING_AND_DATA_QUALITY.md) | Pytest vs dbt tests, DQ, селекторы, `scripts/run_dqc.sh` |
-| [docs/OBSERVABILITY_AND_LOGGING.md](docs/OBSERVABILITY_AND_LOGGING.md) | Grafana/Prometheus под `infra/monitoring`, `meta.*`, логирование |
-| [docs/QUALITY_AND_MONITORING.md](docs/QUALITY_AND_MONITORING.md) | Короткий индекс + контракты ingress/meta |
-
----
-
-## Важно
-
-Песочница **намеренно** упрощена в части ИБ, отказоустойчивости и операционных регламентов крупного продакшена. Подходит для **обучения, прототипов и демо**; для боя нужны отдельная оценка рисков, доступов и SLO.
+Стенд **намеренно** упрощён по ИБ, отказоустойчивости и операционным регламентам «большого» продакшена. Для боя нужны отдельная модель угроз, доступы и SLO.

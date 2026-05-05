@@ -18,12 +18,12 @@ flowchart TB
 
   subgraph WebLayer [За ingress: веб и JSON]
     PORT[portal_web]
-    DBTWEB[dbt-web-backend]
     AFWEB[airflow_webserver]
     MLF[mlflow]
     GRAF[grafana]
     SUP[superset]
     JUP[jupyterhub]
+    NRD[node_red]
     PRUI[prometheus]
     PGWUI[pushgateway]
     SM[spark_master]
@@ -45,23 +45,29 @@ flowchart TB
     PGOLAP[(postgres_olap)]
     PGMETA[(postgres_metadb)]
     KFK[kafka]
+    SR[schema_registry]
+    CONN[debezium_connect]
+    ATLAS[atlas_server]
     RDS[redis]
     MINIO["minio: S3 + UI console"]
   end
 
   Dev --> ING
   ING --> PORT
-  ING --> DBTWEB
   ING --> AFWEB
   ING --> MLF
   ING --> GRAF
   ING --> SUP
   ING --> JUP
+  ING --> NRD
   ING --> PRUI
   ING --> PGWUI
   ING --> MINIO
   ING --> SM
   ING --> SW
+  ING -.->|/atlas/| ATLAS
+  ING -.->|REST| SR
+  ING -.->|REST| CONN
 
   AFWEB --> AFS
   AFWEB --> AFT
@@ -72,9 +78,7 @@ flowchart TB
   AFWEB --> PGOLAP
   AFWEB --> MINIO
 
-  DBTWEB --> DBTREST
-  DBTWEB --> PGOLAP
-  DBTWEB --> MINIO
+  ING -.->|статика dbt/target| DBTCLI
 
   DBTCLI --> PGOLAP
   DBTCLI --> MINIO
@@ -89,19 +93,14 @@ flowchart TB
 
   PORT -.->|read-only docker.sock| DOCKER_HOST[Docker Engine]
 
-  subgraph OptLayer [Опционально overlay / profile]
-    ATLAS[atlas_server]
-    SR[schema_registry]
-    CONN[debezium_connect]
-    GEN[data_generator]
-  end
-
-  ING -.->|/atlas/| ATLAS
-  ING -.->|/schema-registry/| SR
-  ING -.->|/kafka-connect/| CONN
   SR -.-> KFK
   CONN -.-> KFK
   CONN -.-> SR
+
+  subgraph OptProfile [Опционально profile generators]
+    GEN[data_generator]
+  end
+
   GEN -.-> PGOLTP
   GEN -.-> KFK
   GEN -.-> MINIO
@@ -111,8 +110,9 @@ flowchart TB
 ## Заметки по связям
 
 - **minio** — и **S3 API** (`:9000` в сети), и бэкенд **консоли** за ingress (`/minio-console/`). С хоста к API часто `localhost:${MINIO_PORT}`.
-- **dbt-rest** не публикует порт на хост: только `dbt-rest:8580` внутри compose. Вызовы — из Airflow, `dbt-web-backend`, внешних клиентов в сети.
-- **CDC / Atlas:** поднимаются отдельными compose-overlay; ingress-маршруты `/schema-registry/`, `/kafka-connect/`, `/atlas/` живы только при соответствующих контейнерах — см. [`ARCHITECTURE_CDC.md`](../ARCHITECTURE_CDC.md), [`ARCHITECTURE_ATLAS.md`](../ARCHITECTURE_ATLAS.md).
+- **dbt-rest** не публикует порт на хост: только `dbt-rest:8580` внутри compose. Вызовы — из Airflow и внешних клиентов в сети. **dbt Docs** за ingress — только чтение смонтированного **`dbt/target/`** (тот же каталог, что использует CLI-контейнер `dbt` и **dbt-rest** при прогонах).
+- **CDC / Atlas:** в корневом compose; маршруты `/schema-registry/`, `/kafka-connect/`, `/atlas/` — см. [`ARCHITECTURE_CDC.md`](../ARCHITECTURE_CDC.md), [`ARCHITECTURE_ATLAS.md`](../ARCHITECTURE_ATLAS.md).
+- **Node-RED:** за ingress `/node-red/`; учётные данные в `.env` (`NODE_RED_ADMIN_*`).
 
 ## См. также
 

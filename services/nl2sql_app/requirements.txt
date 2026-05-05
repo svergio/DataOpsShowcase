@@ -1,0 +1,14 @@
+Flask==3.0.3
+gunicorn==22.0.0
+langchain==0.2.14
+langchain-core==0.2.33
+mlflow==2.15.1
+pandas==2.2.2
+psycopg2-binary==2.9.9
+SQLAlchemy==2.0.32
+sqlglot==25.20.2
+sentence-transformers==3.0.1
+faiss-cpu==1.8.0.post1
+transformers==4.44.2
+torch==2.3.1
+prometheus_client==0.20.0

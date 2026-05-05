@@ -68,7 +68,12 @@ def _with_run_target_path(argv: list[str], run_id: str) -> list[str]:
         raise ValueError("argv must start with dbt")
     if len(argv) < 2:
         raise ValueError("argv must include dbt subcommand")
-    # In dbt 1.8+, --target-path is a subcommand option, not a global flag before COMMAND.
+    # In dbt 1.8+, --target-path is a subcommand option.
+    # For two-level command "dbt source freshness", place it after "freshness".
+    if len(argv) >= 3 and argv[1] == "source" and argv[2] == "freshness":
+        return ["dbt", "source", "freshness", "--target-path", rel, *argv[3:]]
+    if len(argv) >= 3 and argv[1] == "docs" and argv[2] == "generate":
+        return ["dbt", "docs", "generate", "--target-path", rel, *argv[3:]]
     return ["dbt", argv[1], "--target-path", rel, *argv[2:]]
 
 

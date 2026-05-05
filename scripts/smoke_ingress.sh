@@ -49,12 +49,19 @@ expect_response_contains() {
 
 echo "Smoke ingress BASE=${BASE}"
 expect_url root "${BASE}/"
-expect_url dbt-ui "${BASE}/dbt/"
-expect_url dbt-api-health "${BASE}/dbt-api/v1/health"
+expect_url dbt-docs "${BASE}/dbt/"
+expect_url airflow-health "${BASE}/airflow/health"
+expect_url_status airflow-api-version "${BASE}/airflow/api/v1/version" "^(200|401|403)$"
 expect_url airflow "${BASE}/airflow/"
 expect_url mlflow "${BASE}/mlflow/"
 expect_url grafana "${BASE}/grafana/"
 expect_url superset "${BASE}/superset/"
+superset_double_code="$(curl -sS -o /dev/null -w "%{http_code}" "${BASE}/superset/superset/welcome/")"
+if [[ "${superset_double_code}" != "301" ]]; then
+  echo "FAIL:superset_double_prefix expected 301 got ${superset_double_code} ${BASE}/superset/superset/welcome/" >&2
+  exit 1
+fi
+echo "OK:301 superset_double_prefix_redirect ${BASE}/superset/superset/welcome/"
 expect_url jupyter "${BASE}/jupyter/"
 expect_response_contains prometheus_markup "${BASE}/prometheus/graph" "Prometheus"
 expect_url pushgateway "${BASE}/pushgateway/"
@@ -62,9 +69,11 @@ expect_url spark-master "${BASE}/spark-master/"
 expect_url spark-worker "${BASE}/spark-worker/"
 expect_url minio-console "${BASE}/minio-console/"
 expect_url_status atlas "${BASE}/atlas/" "^(200|301|302|303|307|308|401)$"
+expect_url_status node-red "${BASE}/node-red/" "^(200|301|302|303|307|308|401)$"
 ALT_BASE="${INGRESS_ALT_BASE_URL:-}"
 if [[ -n "${ALT_BASE}" ]]; then
   ALT_BASE="${ALT_BASE%/}"
   expect_url_status atlas_port80 "${ALT_BASE}/atlas/" "^(200|301|302|303|307|308|401)$"
+  expect_url_status node_red_port80 "${ALT_BASE}/node-red/" "^(200|301|302|303|307|308|401)$"
 fi
 echo "All ingress checks passed."

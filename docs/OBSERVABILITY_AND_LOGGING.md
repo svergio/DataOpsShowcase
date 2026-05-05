@@ -10,7 +10,11 @@
 |--------|----------------|
 | Prometheus | [`infra/monitoring/prometheus.yml`](../infra/monitoring/prometheus.yml) |
 | Provisioning Grafana | [`infra/monitoring/grafana/provisioning/`](../infra/monitoring/grafana/provisioning/) |
-| Дашборды (источник правды) | [`infra/monitoring/grafana/dashboards/`](../infra/monitoring/grafana/dashboards/) — в т.ч. `meta-telemetry-postgres.json`, `data-quality-dbt.json`, `pipeline-health-airflow.json` и др. |
+| Дашборды (источник правды) | [`infra/monitoring/grafana/dashboards/`](../infra/monitoring/grafana/dashboards/) — в т.ч. `infrastructure-overview.json`, `pipeline-health-airflow.json`, `kafka-streaming.json`, `spark-jobs-performance.json`, `redis-serving.json`, `dwh-dbt-telemetry.json`, `business-kpis.json`, `stack-containers-cadvisor.json`, `minio-cluster-ops.json`, `superset-meta-ops.json`, `postgres-olap-deep-health.json`, `airflow-metadata-health.json`. |
+
+Метрики контейнеров: Prometheus job `cadvisor` (сервис `cadvisor` в compose). На Docker Desktop для macOS cAdvisor может отдавать неполный набор метрик из-за монтирования `/var/lib/docker`; на Linux-платформах картина полнее.
+
+SQL в Grafana к метаданным: датасорсы **PostgreSQL Superset Meta** (`PGSUP`, БД `superset`) и **PostgreSQL Airflow Meta** (`PGAAF`, БД `airflow`) в [`infra/monitoring/grafana/provisioning/datasources/`](../infra/monitoring/grafana/provisioning/datasources/) (учётные данные по умолчанию как в `.env.example`; при смене пароля обновите provisioning).
 
 В [`docker-compose.yml`](../docker-compose.yml) эти пути монтируются в контейнеры наблюдаемости. В UI: **Meta telemetry (Postgres)** — SQL-панели по `meta.*` и DWH; другие — Pushgateway / Airflow метрики.
 
@@ -28,13 +32,21 @@
 
 Airflow публикует метрики вида `dag_success_total`, `dag_failure_total`, `task_duration_seconds_*` через Pushgateway listener. Вспомогательный код dbt в DAG может отправлять метрики `dataops_dbt_*`.
 
+Дополнительно в мониторинг-контур включены:
+
+- `cadvisor` (Prometheus job `cadvisor`) для CPU/памяти контейнеров compose.
+- `redis_exporter` (Prometheus job `redis_exporter`) для Redis serving метрик.
+- `kafka_exporter` (Prometheus job `kafka_exporter`) для Kafka/streaming состояния.
+- `schema_registry` job для health-check доступности registry.
+- scrape `minio` (`/minio/v2/metrics/cluster`) для метрик MinIO.
+
 ## Логи приложений
 
 В оркестрации и общих сервисах используется структурированный вывод (см. упоминание `JsonFormatter` в `services/common/logging_utils.py` в [PIPELINES.md](PIPELINES.md)). Детальная настройка зависит от сервиса и переменных окружения в compose.
 
 ## Контракт ingress (кратко)
 
-Единая точка входа (см. также [QUALITY_AND_MONITORING.md](QUALITY_AND_MONITORING.md)): `/`, `/dbt/`, `/dbt-api/v1/*`, `/airflow/`, `/mlflow/`, `/grafana/`.
+Единая точка входа (см. также [QUALITY_AND_MONITORING.md](QUALITY_AND_MONITORING.md)): `/`, `/dbt/`, `/airflow/`, `/mlflow/`, `/grafana/`.
 
 ## Чек-лист отладки
 

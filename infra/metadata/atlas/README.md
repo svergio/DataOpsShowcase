@@ -1,13 +1,15 @@
 # Apache Atlas (основной сервис каталога)
 
-Overlay поднимает `sburn/apache-atlas`; учётные данные часто `admin` / `admin`.
+Сервис **`atlas_server`** задаётся в корневом [`docker-compose.yml`](../../docker-compose.yml); образ `sburn/apache-atlas`; учётные данные часто `admin` / `admin`.
 
 **Ingress:** доступ с браузера — через основной ingress (часто `8090->80`; при пробросе `80:80` также `http://localhost/atlas/`). См. [docs/WEB_UI_ACCESS.md](../../docs/WEB_UI_ACCESS.md), [docs/ATLAS_RUNBOOK.md](../../docs/ATLAS_RUNBOOK.md).
 
 ```bash
-export ATLAS_EXTERNAL_NETWORK=dataopsshowcase_dataops_net
-docker compose -f docker-compose.yml -f infra/metadata/atlas/docker-compose.atlas.yml up -d
+cd DataOpsShowcase
+docker compose up -d
 ```
+
+Файл `infra/metadata/atlas/docker-compose.atlas.yml` оставлен пустым (legacy); не добавляйте его вторым `-f`.
 
 Публикация сущностей (идемпотентно: существующие `qualifiedName` пропускаются по умолчанию):
 
@@ -19,6 +21,8 @@ python infra/metadata/atlas/scripts/entity_publish.py \
 ```
 
 Отражение информационной схемы:
+
+Флаг `--emit-entities hive` генерирует YAML с типами Atlas **`hive_db` / `hive_table`** для Postgres (терминология каталога Atlas); **Apache Hive metastore или Thrift здесь не используются.**
 
 ```bash
 PG_REFLECT_DSN=postgresql://oltp_user:oltp_pass@localhost:${PG_OLTP_PORT:-5433}/techmart_oltp \

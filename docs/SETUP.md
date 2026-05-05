@@ -3,7 +3,7 @@
 ## Требования
 
 - **Docker** и **Docker Compose** (V2, команда `docker compose`).
-- **Python 3.11+** — для локальных тестов Python-сервисов (например, `services/dbt_web/backend`).
+- **Python 3.11+** — для локальных тестов Python-сервисов и скриптов в репозитории.
 
 ## Первый запуск
 
@@ -18,10 +18,12 @@
 3. Из корня репозитория `DataOpsShowcase/`:
 
    ```bash
-   docker compose up -d
-   ```
+docker compose up -d
+```
 
-4. Откройте **ingress** (по умолчанию `http://localhost:8090`) и проверьте маршруты из [WEB_UI_ACCESS.md](WEB_UI_ACCESS.md).
+4. Откройте **ingress** (по умолчанию `http://localhost:8090`) и проверьте маршруты из [WEB_UI_ACCESS.md](WEB_UI_ACCESS.md). Опционально с хоста: `./scripts/ingress_smoke.sh`.
+
+**Ресурсы:** Apache Atlas и Node-RED заметно увеличивают потребление RAM; для комфортной работы рассчитывайте **не менее ~12–16 ГБ** доступной памяти хосту под весь стек (ориентир, не жёсткое требование).
 
 ## Postgres OLTP: старый Docker-том и `marketing_campaigns` / расширения
 
@@ -39,7 +41,7 @@
 
 ## Ingress
 
-Nginx публикует единую точку входа: dbt-web, Airflow, MLflow, Grafana, проксирование API. Конфиг: [infra/ingress/nginx.conf](../infra/ingress/nginx.conf).
+Nginx публикует единую точку входа: **dbt Docs**, Airflow, MLflow, Grafana, Node-RED, Atlas, REST-префиксы Schema Registry и Kafka Connect. Конфиг: [infra/ingress/nginx.conf](../infra/ingress/nginx.conf).
 
 ## Postgres MetaDB и dbt-rest
 
@@ -88,18 +90,9 @@ pytest tests/integration -m integration -q
 
 Если переменная для сервиса не задана, соответствующий тест **пропускается** (`skip`), а не падает.
 
-Тесты **dbt-web** backend (без отдельного Node-сборщика в CI):
-
-```bash
-cd services/dbt_web/backend
-pip install -r requirements.txt
-pytest -q
-```
-
 ## CI (GitHub Actions)
 
 - `.github/workflows/dbt-docs.yml` — `dbt parse` / `compile` / `docs` и публикация артефактов
-- `.github/workflows/dbt-web.yml` — проверки **backend** `services/dbt_web`
 
 ## Когда что-то не взводится
 

@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from airflow.decorators import dag, task
 
 from pipelines.utils.dag_factory import default_args
-from pipelines.utils.datasets import DS_DBT_MARTS_DONE, DS_DQ_PASSED
+from pipelines.utils.datasets import DS_DBT_DQC_DONE, DS_DQ_PASSED
 
 DAG_ID = "dag_data_quality_checks"
 
@@ -13,7 +13,7 @@ DAG_ID = "dag_data_quality_checks"
 @dag(
     dag_id=DAG_ID,
     description="Run uniqueness/null/range/referential/SCD2 invariants and fail on critical issues",
-    schedule=[DS_DBT_MARTS_DONE],
+    schedule=[DS_DBT_DQC_DONE],
     start_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
     catchup=False,
     max_active_runs=1,

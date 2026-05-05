@@ -126,7 +126,7 @@ models:
 
   # -------- SATELLITES --------
   - name: sat_customer_details
-    description: "RDV satellite, SCD2: customer descriptive attributes (email, full_name, registered_at)."
+    description: "RDV satellite, SCD2: anonymized customer attributes (customer_hash, masked_email, masked_name)."
     config:
       tags: ['vault', 'rdv', 'satellite', 'scd2']
     columns:

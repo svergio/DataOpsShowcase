@@ -239,6 +239,26 @@ sources:
       warn_after: {count: 60, period: minute}
       error_after: {count: 180, period: minute}
     tables:
+      - name: stg_customers
+        description: "Customers after Spark preprocess: hashed / masked identifiers only (no open PII)."
+        loaded_at_field: effective_from
+        columns:
+          - name: customer_id
+            tests:
+              - not_null:
+                  severity: error
+          - name: customer_hash
+            tests:
+              - not_null:
+                  severity: error
+          - name: masked_email
+          - name: masked_name
+          - name: registered_at
+          - name: source_record_hash
+          - name: effective_from
+            tests:
+              - not_null:
+                  severity: error
       - name: stg_minio_payments
         description: "Files-based payment events landed via MinIO ingestion DAG."
         loaded_at_field: loaded_at

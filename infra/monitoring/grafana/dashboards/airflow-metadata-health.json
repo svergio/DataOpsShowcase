@@ -1,0 +1,69 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {"type": "grafana", "uid": "-- Grafana --"},
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "id": 1,
+      "type": "table",
+      "title": "DAG run states (7d)",
+      "datasource": {"type": "postgres", "uid": "PGAAF"},
+      "gridPos": {"h": 10, "w": 12, "x": 0, "y": 0},
+      "targets": [
+        {
+          "format": "table",
+          "rawSql": "SELECT state, COUNT(*)::bigint AS n FROM dag_run WHERE start_date > NOW() AT TIME ZONE 'UTC' - INTERVAL '7 days' GROUP BY 1 ORDER BY 2 DESC;",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "table",
+      "title": "Slowest DAG runs (7d, top 20 by duration)",
+      "datasource": {"type": "postgres", "uid": "PGAAF"},
+      "gridPos": {"h": 10, "w": 12, "x": 12, "y": 0},
+      "targets": [
+        {
+          "format": "table",
+          "rawSql": "SELECT dag_id, run_id, state, start_date, end_date, (EXTRACT(EPOCH FROM (end_date - start_date)))::numeric AS duration_sec FROM dag_run WHERE start_date > NOW() AT TIME ZONE 'UTC' - INTERVAL '7 days' AND end_date IS NOT NULL ORDER BY duration_sec DESC NULLS LAST LIMIT 20;",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "table",
+      "title": "Recent failed DAG runs",
+      "datasource": {"type": "postgres", "uid": "PGAAF"},
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 10},
+      "targets": [
+        {
+          "format": "table",
+          "rawSql": "SELECT dag_id, run_id, start_date, end_date FROM dag_run WHERE state = 'failed' AND start_date > NOW() AT TIME ZONE 'UTC' - INTERVAL '7 days' ORDER BY start_date DESC LIMIT 30;",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "tags": ["airflow", "metadata", "pipeline"],
+  "templating": {"list": []},
+  "time": {"from": "now-7d", "to": "now"},
+  "title": "Airflow metadata health",
+  "uid": "airflow-meta-health",
+  "version": 1
+}

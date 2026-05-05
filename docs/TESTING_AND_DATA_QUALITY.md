@@ -2,6 +2,8 @@
 
 Где живут проверки в монорепозитории, как они запускаются и как от них отличать **наблюдаемость** (Grafana, метрики) — см. [OBSERVABILITY_AND_LOGGING.md](OBSERVABILITY_AND_LOGGING.md).
 
+**Privacy / staging:** модель `stg_customers` читается из таблицы **`staging.stg_customers`**, заполняемой Spark (анонимизация). Тесты и демо-данные не должны ожидать открытый email в этой цепочке; см. [PIPELINES.md](PIPELINES.md).
+
 ## Где искать код тестов
 
 | Тип | Каталог | Запуск |
@@ -9,7 +11,7 @@
 | Pytest (генератор, конфиги, константы, Kafka-билдеры, совместимость layout dbt/Spark) | [`tests/`](../tests/) (`unit`, `integration`) | `pytest tests/unit`; интеграции — см. [SETUP.md](SETUP.md) |
 | Архитектурная проверка layout dbt | [`tests/unit/test_dbt_project_layout.py`](../tests/unit/test_dbt_project_layout.py) | `pytest tests/unit/test_dbt_project_layout.py` |
 | SQL-тесты dbt (**generic**, DQ-слой) | [`dbt/tests/`](../dbt/tests/) | `cd dbt && dbt test …` |
-| Smoke API сервиса **dbt-web** | [`services/dbt_web/backend/tests/`](../services/dbt_web/backend/tests/) | pytest из каталога бэкенда или CI |
+| Макросы для шаблонов DQC (generic tests, helper SQL) | [`dbt/macros/dqc/`](../dbt/macros/dqc/) | Подключаются из `schema.yml` и singular SQL |
 
 Интерпретация «половины тестов в разных местах»: это **разные исполнители** — интерпретатор Python (`pytest`) и CLI **`dbt`**. Последнему нужен свой проект под [`dbt/dbt_project.yml`](../dbt/dbt_project.yml); путь по умолчанию:
 
@@ -44,7 +46,7 @@ dbt test --selector dqc_all_tests --profiles-dir . --project-dir .
 - **Расширенные P0:** `make p0-verify` — [`scripts/p0_verify.sh`](../scripts/p0_verify.sh).
 - Команда-подсказка: `make dqc-help`.
 
-Airflow выполняет отдельный DAG качества данных (см. [PIPELINES.md](PIPELINES.md)); он не заменяет локальный pytest/dbt-тестами при разработке.
+Airflow: после успешного `dag_dbt_marts_rest` выполняется **`dag_dbt_dqc_rest`** (полный `dbt test` с селектором `dqc_all_tests` через dbt-rest и [`configs/pipeline/dbt_rest.yaml`](../configs/pipeline/dbt_rest.yaml), ключ `runs.dqc`); затем **`dag_data_quality_checks`** (Python-инварианты из `dq_checks.yaml`). Отдельный DAG качества не заменяет локальный `dbt test` при разработке.
 
 ## Аудит дубликатов (исторический контекст)
 

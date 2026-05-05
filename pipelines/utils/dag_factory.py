@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 from datetime import timedelta
 from pathlib import Path
@@ -27,6 +28,30 @@ DEFAULT_ARGS_BASE = {
 
 def default_args(overrides: dict[str, Any] | None = None) -> dict[str, Any]:
     args = dict(DEFAULT_ARGS_BASE)
+    if overrides:
+        args.update(overrides)
+    return args
+
+
+def heavy_pipeline_default_args(overrides: dict[str, Any] | None = None) -> dict[str, Any]:
+    args = default_args(
+        {
+            "max_active_runs": 1,
+            "retries": 3,
+        }
+    )
+    if overrides:
+        args.update(overrides)
+    return args
+
+
+def smtp_aware_default_args(overrides: dict[str, Any] | None = None) -> dict[str, Any]:
+    args = default_args()
+    recipient = os.environ.get("AIRFLOW_ALERT_EMAIL") or os.environ.get("AIRFLOW_SMTP_RECIPIENT")
+    if recipient and os.environ.get("AIRFLOW_SMTP_ENABLED", "").strip().lower() in ("1", "true", "yes"):
+        args = dict(args)
+        args["email"] = [recipient]
+        args["email_on_failure"] = True
     if overrides:
         args.update(overrides)
     return args

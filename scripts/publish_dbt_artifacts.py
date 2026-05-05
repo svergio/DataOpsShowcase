@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Publish dbt artifacts (manifest/catalog/run_results/index.html) to MinIO.
 
-Used by CI/CD to ensure dbt-web can pick up the latest documentation.
+Used by CI/CD to publish dbt documentation artifacts for downstream consumers.
 Idempotent: re-uploads overwrite the same keys.
 """
 from __future__ import annotations
@@ -69,7 +69,7 @@ def main(argv: list[str]) -> int:
         # Run-scoped copy.
         run_key = f"dbt-artifacts/{args.prefix.rstrip('/')}/{name}"
         _put(client, args.bucket, run_key, src)
-        # Latest-success copy (consumed by dbt-web).
+        # Latest-success copy (optional consumers: mirrors, static hosting).
         if args.latest_prefix:
             latest_key = f"dbt-artifacts/{args.latest_prefix.rstrip('/')}/{name}"
             _put(client, args.bucket, latest_key, src)

@@ -9,7 +9,6 @@ from airflow.decorators import dag, task, task_group
 
 from pipelines.utils.dag_factory import default_args
 from pipelines.utils.datasets import DS_RAW_MINIO_FILES
-from pipelines.utils.dbt_web_webhook import EVENT_INGESTION_COMPLETED, notify_dbt_web
 
 DAG_ID = "dag_ingest_minio_files_to_raw"
 SCHEDULE = "*/15 * * * *"
@@ -226,12 +225,6 @@ def ingest_minio_files_to_raw() -> None:
         get_logger(DAG_ID).info(
             "minio raw signal",
             extra={"extra_payload": {"dag": DAG_ID}},
-        )
-        notify_dbt_web(
-            event=EVENT_INGESTION_COMPLETED,
-            dag_id=DAG_ID,
-            run_id=airflow_run_ref,
-            target_layer="raw.minio_files",
         )
         return {"dag": DAG_ID, "status": "published"}
 

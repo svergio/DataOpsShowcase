@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import uuid
 from datetime import datetime, timezone
 from typing import Any
 
@@ -53,7 +54,7 @@ def consume_topic(
     topic_cfg = cfg["topics"][topic_key]
     topic = _resolve_topic(topic_cfg["topic_env"])
     bootstrap = os.environ.get(cfg["bootstrap_servers_env"], "kafka:9092")
-    group_id = f"{cfg['consumer_group_prefix']}-{topic_key}"
+    group_id = f"{cfg['consumer_group_prefix']}-{topic_key}-{uuid.uuid4().hex}"
     max_messages = int(cfg.get("max_messages_per_run", 5000))
     poll_timeout = float(cfg.get("poll_timeout_seconds", 5))
     max_empty_polls = int(cfg.get("max_empty_polls", 3))
@@ -94,8 +95,8 @@ def consume_topic(
                 on_conflict="ON CONFLICT (topic, partition_id, kafka_offset) DO NOTHING",
             )
             new_offsets = {**offsets, **batch.last_offsets}
-            consumer.commit_offsets(batch.last_offsets)
             set_kafka_offsets(pipeline_name, new_offsets, records_processed=inserted)
+            consumer.commit_offsets(batch.last_offsets)
             try:
                 high = consumer.get_high_watermarks()
                 for partition, high_offset in high.items():

@@ -1,30 +1,26 @@
 """
-Production Spark job for cleaning, deduplicating, schema-enforcing
-and de-anonymizing raw events landed by ingestion DAGs.
+Spark job: raw -> staging with privacy — no open PII in staging.
 
-Run: spark-submit --py-files lib_runtime.py,spark_session.py preprocess_orders_payments.py --execution-ts ...
+PII stays in raw only. staging.stg_customers gets customer_hash, masked_email, masked_name.
+Idempotency: bounded slice [ts_lower, ts_upper]; upserts into staging.stg_*.
 
-Idempotency contract:
-  - The job is bounded to a deterministic slice [ts_lower, ts_upper] derived
-    from --execution-ts and --lookback-hours; same input slice produces the
-    same logical result for any number of re-runs.
-  - Writes are upserts (INSERT ... ON CONFLICT) into staging.stg_*; no full
-    table overwrite of staging tables is performed.
-  - A per-slice scratch table (staging._stage_<target>_<slug>) is used as
-    deterministic landing spot for the JDBC writer and is dropped at end.
+Run: spark-submit --py-files ... preprocess_orders_payments.py --execution-ts ...
+
+Requires SPARK_PRIVACY_SALT env (or non-empty --salt) when --env=production.
 """
 from __future__ import annotations
 
 import argparse
 import os
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from pyspark.sql import DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
 from pyspark.sql.types import TimestampType
 
-from lib_runtime import JDBC_DRIVER, execution_slug, jdbc_props, parse_execution_ts, safe_table_token
+from lib_runtime import execution_slug, jdbc_props, parse_execution_ts, safe_table_token
+from privacy_spark import masked_email_col, masked_name_col, stable_customer_hash_expr
 from spark_session import build_spark_session
 
 
@@ -32,16 +28,32 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--execution-ts", required=True)
     parser.add_argument("--lookback-hours", type=int, default=2)
+    parser.add_argument("--env", default=os.environ.get("SPARK_JOB_ENV", "production"))
+    parser.add_argument(
+        "--salt",
+        default="",
+        help="Optional; prefer SPARK_PRIVACY_SALT env in production.",
+    )
     parser.add_argument("--jdbc-url", default=os.environ.get("DWH_JDBC_URL"))
     parser.add_argument("--jdbc-user", default=os.environ.get("DWH_JDBC_USER"))
     parser.add_argument("--jdbc-password", default=os.environ.get("DWH_JDBC_PASSWORD"))
     return parser.parse_args()
 
 
+def _resolve_salt(args: argparse.Namespace) -> str:
+    env_salt = os.environ.get("SPARK_PRIVACY_SALT", "").strip()
+    if env_salt:
+        return env_salt
+    return str(args.salt or "").strip()
+
+
 def _exec_jdbc_sql(spark: SparkSession, jdbc_url: str, props: dict[str, str], sql: str) -> None:
     jvm = spark._jvm  # type: ignore[attr-defined]
-    jvm.java.lang.Class.forName(JDBC_DRIVER)
-    conn = jvm.java.sql.DriverManager.getConnection(jdbc_url, props["user"], props["password"])
+    driver = jvm.org.postgresql.Driver()
+    jprops = jvm.java.util.Properties()
+    for k, v in props.items():
+        jprops.setProperty(k, str(v))
+    conn = driver.connect(jdbc_url, jprops)
     try:
         stmt = conn.createStatement()
         try:
@@ -119,28 +131,14 @@ def _write_incremental_upsert(
     return staged.count()
 
 
-def deanonymize_users(spark: SparkSession, df: DataFrame, jdbc_url: str, props: dict[str, str]) -> DataFrame:
-    users = _read_table(spark, jdbc_url, "raw.oltp_users", props).select(
-        F.col("user_id").cast("long").alias("real_user_id"),
-        F.col("email").alias("email_real"),
-        F.col("full_name").alias("full_name_real"),
-        F.col("created_at").alias("registered_at"),
-    )
-    deduped = users.withColumn(
-        "row_num",
-        F.row_number().over(
-            Window.partitionBy("real_user_id").orderBy(F.col("registered_at").desc_nulls_last())
-        ),
-    ).filter("row_num = 1").drop("row_num")
-    return df.join(deduped, df.customer_id == deduped.real_user_id, how="left")
-
-
 def build_stg_customers(
     spark: SparkSession,
     jdbc_url: str,
     props: dict[str, str],
     ts_lower: datetime,
     ts_upper: datetime,
+    *,
+    salt: str,
 ) -> DataFrame:
     users = _read_table(spark, jdbc_url, "raw.oltp_users", props)
     sliced = _slice_filter(users, ts_lower, ts_upper)
@@ -151,13 +149,25 @@ def build_stg_customers(
             Window.partitionBy("user_id").orderBy(F.col("ingested_at").desc_nulls_last())
         ),
     ).filter("row_num = 1").drop("row_num")
-    cleaned = deduped.select(
+    prep = deduped.select(
         F.col("user_id").cast("long").alias("customer_id"),
-        F.lower(F.trim(F.col("email"))).alias("email"),
-        F.trim(F.col("full_name")).alias("full_name"),
+        F.lower(F.trim(F.col("email"))).alias("_email_raw"),
+        F.trim(F.col("full_name")).alias("_name_raw"),
         F.col("created_at").cast(TimestampType()).alias("registered_at"),
     )
-    return _hash_columns(cleaned, ["customer_id", "email", "full_name"], "source_record_hash")
+    salted = stable_customer_hash_expr(
+        [F.col("customer_id").cast("string"), F.col("_email_raw"), F.col("_name_raw")],
+        salt,
+    )
+    out = prep.withColumn("customer_hash", salted).withColumn(
+        "masked_email",
+        masked_email_col(F.col("_email_raw")),
+    ).withColumn("masked_name", masked_name_col(F.col("_name_raw"))).drop("_email_raw", "_name_raw")
+    return _hash_columns(
+        out,
+        ["customer_id", "customer_hash", "masked_email", "masked_name", "registered_at"],
+        "source_record_hash",
+    )
 
 
 def build_stg_orders(
@@ -215,13 +225,12 @@ def build_stg_order_events(
             )
         ),
     ).filter("row_num = 1").drop("row_num")
-    deanon = deanonymize_users(spark, deduped, jdbc_url, props)
-    return deanon.filter(F.col("event_id").isNotNull()).select(
+    return deduped.filter(F.col("event_id").isNotNull()).select(
         F.concat_ws(":", F.col("topic"), F.col("partition_id"), F.col("kafka_offset")).alias("event_uuid"),
         F.col("event_id"),
         F.col("event_type"),
         F.col("order_id").cast("long"),
-        F.coalesce(F.col("real_user_id"), F.col("customer_id")).cast("long").alias("customer_id"),
+        F.col("customer_id").cast("long"),
         F.col("total_amount").cast("decimal(14,2)"),
         F.upper(F.col("currency")).alias("currency"),
         F.upper(F.col("country_code")).alias("country_code"),
@@ -268,6 +277,14 @@ def main() -> int:
         print("[FAIL] DWH JDBC credentials are missing", file=sys.stderr)
         return 1
 
+    salt = _resolve_salt(args)
+    if args.env == "production" and not salt:
+        print(
+            "[FAIL] SPARK_PRIVACY_SALT or --salt is required for env=production",
+            file=sys.stderr,
+        )
+        return 1
+
     exec_dt = parse_execution_ts(args.execution_ts)
     ts_upper = exec_dt
     ts_lower = exec_dt - timedelta(hours=int(args.lookback_hours))
@@ -278,44 +295,86 @@ def main() -> int:
     try:
         _exec_jdbc_sql(spark, args.jdbc_url, props, "CREATE SCHEMA IF NOT EXISTS staging")
 
-        stg_customers = build_stg_customers(spark, args.jdbc_url, props, ts_lower, ts_upper)
+        stg_customers = build_stg_customers(
+            spark, args.jdbc_url, props, ts_lower, ts_upper, salt=salt
+        )
         stg_orders = build_stg_orders(spark, args.jdbc_url, props, ts_lower, ts_upper)
         stg_order_events = build_stg_order_events(spark, args.jdbc_url, props, ts_lower, ts_upper)
         stg_payment_events = build_stg_payment_events(spark, args.jdbc_url, props, ts_lower, ts_upper)
 
         n_customers = _write_incremental_upsert(
-            spark, stg_customers, args.jdbc_url, "staging.stg_customers",
+            spark,
+            stg_customers,
+            args.jdbc_url,
+            "staging.stg_customers",
             pk_columns=["customer_id"],
-            update_columns=["email", "full_name", "registered_at", "source_record_hash"],
-            props=props, execution_slug=slug,
+            update_columns=[
+                "customer_hash",
+                "masked_email",
+                "masked_name",
+                "registered_at",
+                "source_record_hash",
+            ],
+            props=props,
+            execution_slug=slug,
         )
         n_orders = _write_incremental_upsert(
-            spark, stg_orders, args.jdbc_url, "staging.stg_orders",
+            spark,
+            stg_orders,
+            args.jdbc_url,
+            "staging.stg_orders",
             pk_columns=["order_id"],
             update_columns=[
-                "customer_id", "order_ts", "status", "currency_code",
-                "total_amount", "source_record_hash",
+                "customer_id",
+                "order_ts",
+                "status",
+                "currency_code",
+                "total_amount",
+                "source_record_hash",
             ],
-            props=props, execution_slug=slug,
+            props=props,
+            execution_slug=slug,
         )
         n_order_events = _write_incremental_upsert(
-            spark, stg_order_events, args.jdbc_url, "staging.stg_order_events",
+            spark,
+            stg_order_events,
+            args.jdbc_url,
+            "staging.stg_order_events",
             pk_columns=["event_uuid"],
             update_columns=[
-                "event_id", "event_type", "order_id", "customer_id",
-                "total_amount", "currency", "country_code", "event_ts",
-            ],
-            props=props, execution_slug=slug,
-        )
-        n_payment_events = _write_incremental_upsert(
-            spark, stg_payment_events, args.jdbc_url, "staging.stg_payment_events",
-            pk_columns=["event_uuid"],
-            update_columns=[
-                "event_id", "event_type", "payment_id", "order_id", "transaction_id",
-                "amount", "currency", "payment_method", "status", "decline_reason",
+                "event_id",
+                "event_type",
+                "order_id",
+                "customer_id",
+                "total_amount",
+                "currency",
+                "country_code",
                 "event_ts",
             ],
-            props=props, execution_slug=slug,
+            props=props,
+            execution_slug=slug,
+        )
+        n_payment_events = _write_incremental_upsert(
+            spark,
+            stg_payment_events,
+            args.jdbc_url,
+            "staging.stg_payment_events",
+            pk_columns=["event_uuid"],
+            update_columns=[
+                "event_id",
+                "event_type",
+                "payment_id",
+                "order_id",
+                "transaction_id",
+                "amount",
+                "currency",
+                "payment_method",
+                "status",
+                "decline_reason",
+                "event_ts",
+            ],
+            props=props,
+            execution_slug=slug,
         )
 
         print(

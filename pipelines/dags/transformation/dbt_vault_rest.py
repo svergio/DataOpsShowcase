@@ -11,7 +11,6 @@ from pipelines.utils.datasets import (
     DS_DBT_VAULT_DONE,
     DS_RAW_KAFKA_EXTENSIONS,
 )
-from pipelines.utils.dbt_web_webhook import EVENT_DATAVAULT_COMPLETED, notify_dbt_web
 
 DAG_ID = "dag_dbt_vault_rest"
 
@@ -22,7 +21,7 @@ DAG_ID = "dag_dbt_vault_rest"
     schedule=(DS_DBT_STAGING_DONE | DS_RAW_KAFKA_EXTENSIONS),
     start_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
     catchup=False,
-    max_active_runs=1,
+    max_active_runs=2,
     default_args=default_args({"retries": 5}),
     tags=["dbt", "vault", "rest"],
 )
@@ -33,12 +32,6 @@ def dbt_vault_rest() -> None:
 
     @task(outlets=[DS_DBT_VAULT_DONE])
     def publish(payload: dict) -> dict:
-        notify_dbt_web(
-            event=EVENT_DATAVAULT_COMPLETED,
-            dag_id=DAG_ID,
-            run_id=str(payload.get("run_id") or ""),
-            target_layer="vault",
-        )
         return {"dag": DAG_ID, "status": "published", **payload}
 
     publish(run())

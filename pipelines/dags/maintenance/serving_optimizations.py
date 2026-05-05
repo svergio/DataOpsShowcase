@@ -69,6 +69,20 @@ def serving_optimizations() -> None:
             finish_run(run_meta, status="failed", error_message=str(exc))
             raise
 
+    @task(retries=2)
+    def materialize_redis_serving() -> dict:
+        from services.common.run_metadata import finish_run, start_run
+        from services.serving.redis_materializer import materialize_redis_and_snapshot
+
+        run_meta = start_run(dag_id=DAG_ID, task_id="materialize_redis_serving", source="serving", layer="serving")
+        try:
+            result = materialize_redis_and_snapshot("postgres_dwh")
+            finish_run(run_meta, status="success", rows_out=int(result.get("processed", 0)), payload=result)
+            return result
+        except Exception as exc:
+            finish_run(run_meta, status="failed", error_message=str(exc))
+            raise
+
     @task(outlets=[DS_SERVING_OPTIMIZED])
     def publish(payloads: list[dict]) -> dict:
         return {"dag": DAG_ID, "status": "published", "payloads": payloads}
@@ -76,7 +90,8 @@ def serving_optimizations() -> None:
     indexes = ensure_marts_indexes()
     vacuum = vacuum_analyze_marts()
     reindex_task = reindex_marts()
-    indexes >> vacuum >> reindex_task >> publish([indexes, vacuum, reindex_task])
+    redis_snapshot = materialize_redis_serving()
+    indexes >> vacuum >> reindex_task >> redis_snapshot >> publish([indexes, vacuum, reindex_task, redis_snapshot])
 
 
 dag = serving_optimizations()

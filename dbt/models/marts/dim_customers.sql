@@ -11,9 +11,7 @@
     ]
 ) }}
 
-{# dim_customers — current snapshot, sourced from BDV business satellite + raw customer details.
-   Marts read BDV (sat_customer_business) + raw sat (for full_name) to avoid
-   chasing satellites separately. #}
+{# dim_customers — BDV + anonymized customer satellite. #}
 WITH cust_b AS (
     SELECT
         hub_key,
@@ -30,8 +28,9 @@ WITH cust_b AS (
 cust_raw AS (
     SELECT
         hub_key,
-        email,
-        full_name,
+        customer_hash,
+        masked_email,
+        masked_name,
         registered_at
     FROM {{ ref('sat_customer_details') }}
     WHERE is_current = TRUE
@@ -43,8 +42,9 @@ hub AS (
 SELECT
     h.hub_key                          AS customer_hub_key,
     h.business_key                     AS customer_bk,
-    cr.email                           AS email,
-    cr.full_name                       AS full_name,
+    cr.customer_hash                   AS customer_hash,
+    cr.masked_email                    AS masked_email,
+    cr.masked_name                     AS masked_name,
     cr.registered_at                   AS registered_at,
     cb.email_domain                    AS email_domain,
     cb.is_email_valid                  AS is_email_valid,

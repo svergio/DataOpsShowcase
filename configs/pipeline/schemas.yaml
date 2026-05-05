@@ -23,8 +23,7 @@ raw_minio_payments:
   iso_currency: [currency]
 
 stg_customers:
-  required: [customer_id, email, full_name]
-  email_pattern: "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+  required: [customer_id, customer_hash, source_record_hash]
 
 stg_orders:
   required: [order_id, customer_id, order_ts, status, currency_code, total_amount]

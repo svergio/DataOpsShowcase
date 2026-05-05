@@ -6,7 +6,7 @@
 
 **Назначение:** показать, **в каких схемах** лежат слои витрины и метаданных в текущем репозитории. Согласовано с [dbt/dbt_project.yml](../../dbt/dbt_project.yml) и init SQL: [04_dwh_extensions.sql](../../services/postgres/init/04_dwh_extensions.sql), [06_dwh_raw_generators_extensions.sql](../../services/postgres/init/06_dwh_raw_generators_extensions.sql), [dbt/macros/utils/ensure_dwh_schemas.sql](../../dbt/macros/utils/ensure_dwh_schemas.sql).
 
-**Слой raw (OLAP):** помимо базовых `raw.oltp_*` / `raw.kafka_*`, расширения генератора (маркетинг, SEO, HR, GL, Kafka extension-топики) лежат в таблицах из `06_dwh_raw_generators_extensions.sql`. Канон бизнес-ключей для dbt-моделей: [../DV2_ENTITY_KEYS.md](../DV2_ENTITY_KEYS.md).
+**Слой raw (OLAP):** помимо базовых `raw.oltp_*` / `raw.kafka_*`, расширения генератора (маркетинг, SEO, HR, GL, Kafka extension-топики) создаются в [04_dwh_extensions.sql](../../services/postgres/init/04_dwh_extensions.sql) при инициализации нового OLAP-тома. Файл [06_dwh_raw_generators_extensions.sql](../../services/postgres/init/06_dwh_raw_generators_extensions.sql) остаётся как idempotent-патч для legacy-томов. Канон бизнес-ключей для dbt-моделей: [../DV2_ENTITY_KEYS.md](../DV2_ENTITY_KEYS.md).
 
 **Волна BDV (pit/bridge)** для новых хабов при необходимости выносится отдельно — см. [data_vault_flow.md](data_vault_flow.md).
 

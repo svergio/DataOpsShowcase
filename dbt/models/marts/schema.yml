@@ -5,13 +5,17 @@ models:
     description: "Customer dimension with BDV-derived segment, sourced from sat_customer_business."
     config:
       tags: ['marts', 'dim']
+    tests:
+      - dqc_min_row_count:
+          min_count: 1
     columns:
       - name: customer_hub_key
         tests: [not_null, unique]
       - name: customer_bk
         tests: [not_null]
-      - name: email
-      - name: full_name
+      - name: customer_hash
+      - name: masked_email
+      - name: masked_name
       - name: customer_segment
         tests:
           - accepted_values:
@@ -41,6 +45,9 @@ models:
     description: "Order fact built on bridge_customer_order + sat_order_enriched."
     config:
       tags: ['marts', 'fact']
+    tests:
+      - dqc_min_row_count:
+          min_count: 1
     columns:
       - name: order_hub_key
         tests: [not_null, unique]
@@ -55,6 +62,8 @@ models:
                 where: "customer_hub_key is not null"
       - name: status
       - name: total_amount
+        tests:
+          - dqc_non_negative_column: {}
       - name: currency
       - name: order_ts
       - name: order_date
@@ -82,6 +91,8 @@ models:
               config:
                 where: "order_hub_key is not null"
       - name: amount
+        tests:
+          - dqc_non_negative_column: {}
       - name: status
       - name: payment_method
       - name: payment_ts
@@ -91,15 +102,21 @@ models:
     description: "Daily sales aggregation per currency."
     config:
       tags: ['marts', 'fact', 'daily']
+    tests:
+      - dqc_min_row_count:
+          min_count: 1
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: ['order_date', 'currency']
     columns:
       - name: order_date
         tests: [not_null]
       - name: currency
         tests: [not_null]
       - name: order_count
-        tests: [not_null]
+        tests:
+          - not_null
+          - dqc_non_negative_column: {}
       - name: gross_sales
-        tests: [not_null]
-    tests:
-      - dbt_utils.unique_combination_of_columns:
-          combination_of_columns: ['order_date', 'currency']
+        tests:
+          - not_null
+          - dqc_non_negative_column: {}

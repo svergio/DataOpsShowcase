@@ -21,6 +21,23 @@
 
 **Слойность (упрощённо):** источники → ingestion → storage → transformation → serving → monitoring (детализация в [ARCHITECTURE.md](ARCHITECTURE.md)).
 
+## Две шкалы приоритетов
+
+### Шкала A — CDC, Schema Registry, Kafka Connect, Atlas, DQ и lineage (P0–P4)
+
+- **P0 — Стек поднимается и доступен:** Schema Registry, Kafka Connect (Debezium), Atlas в основном `docker-compose.yml`; ingress и портал без пометки «опционально» для этих сервисов; шаблоны curl для REST; единая документация; Node-RED в стеке с `adminAuth` из `.env`.
+- **P1 — Репликация и наблюдаемость:** регистрация Debezium-коннекторов воспроизводимо (скрипт, Makefile, one-shot init или DAG); проверяемые слоты PostgreSQL; lag и метрики на Grafana / шаблон алертов.
+- **P2 — Каталог и lineage:** регулярная публикация сущностей в Atlas (Airflow DAG или cron в compose); связка артефактов dbt / витрин с Atlas (минимум — существующие YAML + автозапуск); DQ gates Atlas ↔ Prometheus в runbook как обязательный шаг после деплоя.
+- **P3 — Интеграция SR в контурах данных:** Avro (или иной формат) и использование Schema Registry в коннекторах и потребителях; согласование имён топиков `cdc_*` со Spark/streaming примером.
+- **P4 — Зрелый lineage:** OpenLineage/Marquez или аналог, сквозной граф от источника до marts; политики доступа к каталогу; SLO на задержку CDC.
+
+### Шкала B — Остальная платформа (P0–P3)
+
+- **P0:** Стабильный core (Postgres, Kafka, MinIO, Airflow, dbt-rest, dbt Docs, портал, базовая observability) — текущая база репозитория.
+- **P1:** Node-RED — типовые flow (алерт, заглушка дашборда, webhook); расширения generators/profile по одному сценарию.
+- **P2:** Выборочные пункты блоков A/B Roadmap (ETL/ML MVP) без раздувания области.
+- **P3:** Блоки C/D дорожной карты (мессенджер инвестору, RAG-ограждения) — после стабильности данных.
+
 ---
 
 ## 15 направлений доработки на ближайшее время
@@ -186,8 +203,7 @@
 - тесты: `freshness`, `unique`, `not_null` на критичных моделях;
 - для критичных: `severity: error` (см. `dbt_project`);
 - `dbt docs` в CI, артефакты;
-- dbt-web в compose (текущее состояние: [WEB_UI_ACCESS.md](WEB_UI_ACCESS.md));
-- webhooks Airflow → dbt-web (события готовности слоёв) — по мере внедрения.
+- **dbt Docs** за ingress (статика `dbt/target/`, см. [WEB_UI_ACCESS.md](WEB_UI_ACCESS.md)).
 
 #### Data quality
 
@@ -255,7 +271,7 @@
 
 | Приоритет | Фокус |
 |-----------|--------|
-| **P0** | Стабильный compose, ingress, [dbt-web](WEB_UI_ACCESS.md) и [API](API.md); dbt-тесты и `store_failures` в `dwh_dq`; `meta.*` (прогоны, watermarks); базовые дашборды. Без надёжной базы детальные пункты 1–15 **не** демонстрируются. |
+| **P0** | Стабильный compose, ingress, [dbt Docs](WEB_UI_ACCESS.md) и [API](API.md); dbt-тесты и `store_failures` в `dwh_dq`; `meta.*` (прогоны, watermarks); базовые дашборды. Без надёжной базы детальные пункты 1–15 **не** демонстрируются. |
 | **P1** | Поэтапная реализация **блока A (1–10)** и **блока B (11–15)** в виде MVP: один-два сценария ETL, один ML-пилот, расширение [Generators.md](Generators.md) и [business/use_cases.md](business/use_cases.md). |
 | **P2** | **Блок C** в полноте: OpenLineage, сильный CI, каталог метрик, алерты в мессенджеры, model registry, мультиарендность не требуется. **Блок D:** по желанию — v1 (push-сводка) как демо канала к инвестору; v2/v3 — после стабильности данных и политик ИБ. |
 

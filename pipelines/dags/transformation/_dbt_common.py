@@ -29,7 +29,7 @@ def run_dbt_layer(*, dag_id: str, layer: str) -> dict[str, Any]:
     layer_cfg = cfg["runs"].get(layer)
     if not layer_cfg:
         raise ValueError(f"dbt layer not configured: {layer}")
-    client = build_client_from_config(cfg.get("connection", {}), cfg.get("retry", {}))
+    client = build_client_from_config(cfg.get("connection", {}), cfg.get("retry", {}), cfg)
     request = DbtRunRequest(
         job_name=layer_cfg["job_name"],
         selectors=list(layer_cfg.get("selectors", [])),
@@ -61,6 +61,7 @@ def run_dbt_layer(*, dag_id: str, layer: str) -> dict[str, Any]:
             "finished_at": result.finished_at,
             "artifacts_url": result.artifacts_url,
             "duration_seconds": duration_seconds,
+            "partial_success": result.partial,
         }
         finish_run(run_meta, status="success", payload=payload)
         logger.info("dbt layer succeeded", extra={"extra_payload": payload})

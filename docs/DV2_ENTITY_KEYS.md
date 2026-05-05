@@ -1,6 +1,6 @@
 # Канон бизнес-ключей Data Vault (расширения генератора)
 
-Согласовано с [Generators.md](Generators.md), [diagrams/oltp-er.md](diagrams/oltp-er.md) и raw-таблицами в `services/postgres/init/06_dwh_raw_generators_extensions.sql`.
+Согласовано с [Generators.md](Generators.md), [diagrams/oltp-er.md](diagrams/oltp-er.md) и raw-таблицами в `services/postgres/init/04_dwh_extensions.sql` (для новых OLAP volume). Файл `services/postgres/init/06_dwh_raw_generators_extensions.sql` используется как idempotent-патч для legacy volume.
 
 | Сущность | Hub (логическое имя) | Business key (столбец BK) | Источник raw |
 |----------|----------------------|----------------------------|--------------|

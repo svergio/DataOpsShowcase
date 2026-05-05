@@ -23,7 +23,8 @@
 | Оркестрация | **Apache Airflow** | DAG, datasets, вызовы dbt/Spark |
 | MLOps | **MLflow** | Эксперименты и артефакты обучения |
 | Наблюдаемость | **Prometheus**, **Grafana** | Метрики и дашборды |
-| Web UI | **dbt-web** (Flask) | Просмотр runs, моделей, тестов, lineage, ссылок на manifest |
+| Web UI | **dbt Docs** (статика) | Документация и lineage после `dbt docs generate`, префикс `/dbt/` |
+| BI и демо UI | **Apache Superset**, NL2SQL (`/nl2sql/`) | Витрины OLAP и текст→SQL; см. [SUPERSET.md](SUPERSET.md), [services/nl2sql_app/README.md](../services/nl2sql_app/README.md) |
 
 Публикация HTTP наружу идёт через **единый nginx ingress**: большинство ссылок в портале — полноценные веб-интерфейсы; префиксы **`/schema-registry/`** и **`/kafka-connect/`** — это **REST/API** (ответы JSON), и они живы только при CDC-overlay ([ARCHITECTURE_CDC.md](ARCHITECTURE_CDC.md)).
 
@@ -49,11 +50,11 @@
 
 - **Ingestion**: сравнение сырого слоя с генератором (Kafka, MinIO, OLTP).
 - **Пайплайн end-to-end**: прогон цепочки Airflow, проверка `meta.pipeline_*` и витрин.
-- **dbt**: `staging` → `vault` → `marts`, тесты и документация, UI **dbt-web** по префиксу `/dbt/` (см. [WEB_UI_ACCESS.md](WEB_UI_ACCESS.md)).
+- **dbt**: `staging` → `vault` → `marts`, тесты и `dbt docs generate`, статический сайт **dbt Docs** по префиксу `/dbt/` (см. [WEB_UI_ACCESS.md](WEB_UI_ACCESS.md)).
 - **Data Vault**: согласованность ссылок hub/link/sat, SCD2.
 - **ML**: обучение из DAG, чтение MLflow, сверка с `ml/training/`.
 - **Наблюдаемость**: логи, метрики, Grafana.
-- **Регресс API**: [API.md](API.md) — health, runs, lineage, webhooks (по настройке); CDC-префиксы ingress — REST, см. [WEB_UI_ACCESS.md](WEB_UI_ACCESS.md).
+- **Регресс API**: [API.md](API.md) — health и вызовы **dbt-rest**; CDC-префиксы ingress — REST, см. [WEB_UI_ACCESS.md](WEB_UI_ACCESS.md).
 
 ## Связанные документы
 
