@@ -16,6 +16,7 @@ DS_VAULT_SCD2_DONE = Dataset("postgres://postgres_dwh/vault/scd2")
 DS_DBT_STAGING_DONE = Dataset("dbt://staging")
 DS_DBT_VAULT_DONE = Dataset("dbt://vault")
 DS_DBT_MARTS_DONE = Dataset("dbt://marts")
+DS_DBT_BUSINESS_KPIS_DONE = Dataset("dbt://business_kpis")
 DS_DBT_DQC_DONE = Dataset("dbt://dqc")
 
 DS_DQ_PASSED = Dataset("dq://post-marts")

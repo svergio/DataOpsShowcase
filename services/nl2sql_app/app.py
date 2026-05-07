@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import json
 import logging
 import os
+import threading
 import time
 import uuid
 from dataclasses import dataclass
 
 import mlflow
+import redis
 from flask import Flask, Response, jsonify, render_template, request
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
@@ -31,20 +34,21 @@ PUBLIC_MODEL_UNAVAILABLE_MSG = (
 )
 
 
-def _error_stage(exc: BaseException) -> str:
-    text = str(exc).lower()
-    if "sql_execution" in text or "undefined" in text or "syntax error" in text:
-        return "execution"
-    if "validation" in text:
-        return "validation"
-    return "generation"
-
-
-def _record_request_http(*, ok: bool, elapsed_s: float, stage: str) -> None:
-    status = "success" if ok else "error"
-    prom.REQUEST_COUNT.labels(status, stage).inc()
-    prom.TOTAL_LATENCY_SECONDS.labels(status, stage).observe(elapsed_s)
-    prom.REQUEST_LATENCY_SECONDS.labels(status, stage).observe(elapsed_s)
+def _classify_error(error_text: str) -> str:
+    lowered = error_text.lower()
+    if "forbidden sql statement" in lowered:
+        return "forbidden_keyword"
+    if "table is not whitelisted" in lowered:
+        return "unknown_table"
+    if "empty sql generated" in lowered:
+        return "empty_sql"
+    if "invalid expression" in lowered or "unexpected token" in lowered:
+        return "parse_error"
+    if "syntax error" in lowered:
+        return "sql_syntax_error"
+    if "timeout" in lowered:
+        return "timeout"
+    return "runtime_error"
 
 
 def _log_mlflow_load_error_if_any(svc: NL2SQLService) -> None:
@@ -67,6 +71,13 @@ class AppConfig:
     auto_log_model: bool
     model_name: str
     nl2sql_debug: bool
+    redis_url: str
+    redis_queue_key: str
+    redis_job_ttl_sec: int
+    profile: str
+    base_model_id: str
+    max_new_tokens: int
+    temperature: float
 
     @classmethod
     def from_env(cls) -> "AppConfig":
@@ -83,6 +94,18 @@ class AppConfig:
         auto_log_model = os.environ.get("NL2SQL_AUTO_LOG_MODEL", "false").lower() == "true"
         model_name = os.environ.get("NL2SQL_MODEL_NAME", "nl2sql_qwen")
         nl2sql_debug = os.environ.get("NL2SQL_DEBUG", "false").lower() == "true"
+        redis_url = os.environ.get("NL2SQL_REDIS_URL", "redis://redis:6379/5")
+        redis_queue_key = os.environ.get("NL2SQL_QUEUE_KEY", "nl2sql:queue")
+        redis_job_ttl_sec = int(os.environ.get("NL2SQL_JOB_TTL_SEC", "3600"))
+        profile = os.environ.get("NL2SQL_PROFILE", "stable").lower()
+        if profile == "fast":
+            base_model_id = os.environ.get("NL2SQL_FAST_MODEL_ID", "Qwen/Qwen2.5-0.5B-Instruct")
+            max_new_tokens = int(os.environ.get("NL2SQL_FAST_MAX_NEW_TOKENS", "96"))
+            temperature = float(os.environ.get("NL2SQL_FAST_TEMPERATURE", "0.0"))
+        else:
+            base_model_id = os.environ.get("NL2SQL_STABLE_MODEL_ID", "Qwen/Qwen2.5-0.5B-Instruct")
+            max_new_tokens = int(os.environ.get("NL2SQL_STABLE_MAX_NEW_TOKENS", "128"))
+            temperature = float(os.environ.get("NL2SQL_STABLE_TEMPERATURE", "0.0"))
         return cls(
             db_url=db_url,
             mlflow_tracking_uri=mlflow_tracking_uri,
@@ -92,7 +115,155 @@ class AppConfig:
             auto_log_model=auto_log_model,
             model_name=model_name,
             nl2sql_debug=nl2sql_debug,
+            redis_url=redis_url,
+            redis_queue_key=redis_queue_key,
+            redis_job_ttl_sec=redis_job_ttl_sec,
+            profile=profile,
+            base_model_id=base_model_id,
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,
         )
+
+
+class RedisQueryQueue:
+    def __init__(
+        self,
+        *,
+        redis_url: str,
+        queue_key: str,
+        job_ttl_sec: int,
+        service: NL2SQLService,
+        debug_enabled: bool,
+    ) -> None:
+        self.redis = redis.Redis.from_url(redis_url, decode_responses=True)
+        self.queue_key = queue_key
+        self.job_ttl_sec = job_ttl_sec
+        self.service = service
+        self.debug_enabled = debug_enabled
+        self._thread: threading.Thread | None = None
+
+    @staticmethod
+    def _job_key(job_id: str) -> str:
+        return f"nl2sql:job:{job_id}"
+
+    def enqueue(self, question: str) -> str:
+        job_id = str(uuid.uuid4())
+        job_key = self._job_key(job_id)
+        now_ms = int(time.time() * 1000)
+        queue_position = self.redis.llen(self.queue_key) + 1
+        self.redis.hset(
+            job_key,
+            mapping={
+                "status": "queued",
+                "stage": "queued",
+                "question": question,
+                "queue_position": queue_position,
+                "created_at_ms": now_ms,
+                "updated_at_ms": now_ms,
+            },
+        )
+        self.redis.expire(job_key, self.job_ttl_sec)
+        self.redis.rpush(self.queue_key, job_id)
+        return job_id
+
+    def get_status(self, job_id: str) -> dict[str, object] | None:
+        job_key = self._job_key(job_id)
+        data = self.redis.hgetall(job_key)
+        if not data:
+            return None
+        status = data.get("status", "queued")
+        payload: dict[str, object] = {
+            "job_id": job_id,
+            "status": status,
+            "stage": data.get("stage", "queued"),
+            "created_at_ms": int(data.get("created_at_ms", "0") or 0),
+            "updated_at_ms": int(data.get("updated_at_ms", "0") or 0),
+            "elapsed_ms": max(
+                0,
+                int(data.get("updated_at_ms", "0") or 0) - int(data.get("created_at_ms", "0") or 0),
+            ),
+        }
+        if status == "queued":
+            current_pos = self.redis.lpos(self.queue_key, job_id)
+            if current_pos is not None:
+                payload["queue_position"] = int(current_pos) + 1
+            elif data.get("queue_position"):
+                payload["queue_position"] = int(data["queue_position"])
+        if status == "done" and data.get("result"):
+            payload["result"] = json.loads(data["result"])
+        if status == "error":
+            payload["error"] = data.get("error_message", data.get("error", "unknown error"))
+            payload["error_message"] = data.get("error_message", data.get("error", "unknown error"))
+            payload["error_code"] = data.get("error_code", "runtime_error")
+            if data.get("trace_id"):
+                payload["trace_id"] = data["trace_id"]
+        return payload
+
+    def start(self) -> None:
+        if self._thread and self._thread.is_alive():
+            return
+        self._thread = threading.Thread(target=self._worker_loop, daemon=True, name="nl2sql-redis-worker")
+        self._thread.start()
+
+    def _set_job_state(self, job_id: str, mapping: dict[str, object]) -> None:
+        job_key = self._job_key(job_id)
+        to_write = {k: json.dumps(v) if isinstance(v, (dict, list)) else str(v) for k, v in mapping.items()}
+        to_write["updated_at_ms"] = str(int(time.time() * 1000))
+        self.redis.hset(job_key, mapping=to_write)
+        self.redis.expire(job_key, self.job_ttl_sec)
+
+    def _worker_loop(self) -> None:
+        logger.info("nl2sql_queue_worker_started queue_key=%s", self.queue_key)
+        while True:
+            try:
+                item = self.redis.blpop(self.queue_key, timeout=5)
+                if not item:
+                    continue
+                _, job_id = item
+                job_key = self._job_key(job_id)
+                question = self.redis.hget(job_key, "question")
+                if not question:
+                    self._set_job_state(
+                        job_id,
+                        {
+                            "status": "error",
+                            "stage": "error",
+                            "error_code": "validation_error",
+                            "error_message": "missing question",
+                        },
+                    )
+                    continue
+                self._set_job_state(job_id, {"status": "processing", "stage": "processing"})
+                trace_id = str(uuid.uuid4())
+                started = time.perf_counter()
+
+                def _on_stage(stage_name: str) -> None:
+                    self._set_job_state(job_id, {"status": "processing", "stage": stage_name})
+
+                result = self.service.answer_question(
+                    question,
+                    debug=self.debug_enabled,
+                    trace_id=trace_id,
+                    stage_callback=_on_stage,
+                )
+                if "latency_ms" not in result:
+                    result["latency_ms"] = int((time.perf_counter() - started) * 1000)
+                self._set_job_state(job_id, {"status": "done", "stage": "done", "result": result})
+            except Exception as exc:  # noqa: BLE001
+                if "job_id" in locals():
+                    err = str(exc) or "nl2sql queue worker failed"
+                    self._set_job_state(
+                        job_id,
+                        {
+                            "status": "error",
+                            "stage": "error",
+                            "error_code": _classify_error(err),
+                            "error_message": err,
+                            "trace_id": locals().get("trace_id", ""),
+                        },
+                    )
+                logger.exception("nl2sql_queue_worker_unhandled_error: %s", exc)
+                time.sleep(1)
 
 
 def _ensure_model_logged(cfg: AppConfig) -> None:
@@ -123,9 +294,9 @@ def _ensure_model_logged(cfg: AppConfig) -> None:
             python_model=QwenModel(),
             registered_model_name=cfg.model_name,
             model_config={
-                "model_id": os.environ.get("NL2SQL_BASE_MODEL_ID", "Qwen/Qwen2.5-3B-Instruct"),
-                "max_new_tokens": int(os.environ.get("NL2SQL_MAX_NEW_TOKENS", "256")),
-                "temperature": float(os.environ.get("NL2SQL_TEMPERATURE", "0.0")),
+                "model_id": cfg.base_model_id,
+                "max_new_tokens": cfg.max_new_tokens,
+                "temperature": cfg.temperature,
             },
             pip_requirements=[
                 "mlflow==2.15.1",
@@ -166,6 +337,14 @@ def create_app() -> Flask:
     )
     app.config["NL2SQL_SERVICE"] = service
     app.config["NL2SQL_DEBUG"] = cfg.nl2sql_debug
+    query_queue = RedisQueryQueue(
+        redis_url=cfg.redis_url,
+        queue_key=cfg.redis_queue_key,
+        job_ttl_sec=cfg.redis_job_ttl_sec,
+        service=service,
+        debug_enabled=cfg.nl2sql_debug,
+    )
+    query_queue.start()
     app.config["ASSET_VERSION"] = os.environ.get("NL2SQL_ASSET_VERSION", "3")
     app.config["SEND_FILE_MAX_AGE_DEFAULT"] = int(
         os.environ.get("NL2SQL_STATIC_MAX_AGE", "120"),
@@ -261,66 +440,19 @@ def create_app() -> Flask:
 
     @app.post("/query")
     def query() -> Response:
-        svc: NL2SQLService = app.config["NL2SQL_SERVICE"]
         payload = request.get_json(silent=True) or {}
         question = str(payload.get("question", "")).strip()
-        trace_id = str(uuid.uuid4())
-        started = time.perf_counter()
         if not question:
-            elapsed = time.perf_counter() - started
-            _record_request_http(ok=False, elapsed_s=elapsed, stage="validation")
-            return jsonify({"error": "question is required", "trace_id": trace_id}), 400
-        if not svc.model_registered():
-            _log_mlflow_load_error_if_any(svc)
-            return jsonify({"error": PUBLIC_MODEL_UNAVAILABLE_MSG, "trace_id": trace_id}), 503
-        debug_flag = bool(app.config.get("NL2SQL_DEBUG"))
-        try:
-            result = svc.answer_question(question, debug=debug_flag, trace_id=trace_id)
-        except RuntimeError as exc:
-            elapsed = time.perf_counter() - started
-            _record_request_http(ok=False, elapsed_s=elapsed, stage="generation")
-            _log_mlflow_load_error_if_any(svc)
-            logger.error(
-                "nl2sql_mlflow_runtime_failed",
-                exc_info=True,
-                extra={
-                    "nl2sql": {
-                        "event": "nl2sql_mlflow_runtime_failed",
-                        "trace_id": trace_id,
-                        "question": question,
-                        "error": str(exc),
-                    },
-                },
-            )
-            return jsonify(
-                {
-                    "error": str(exc) or PUBLIC_MODEL_UNAVAILABLE_MSG,
-                    "trace_id": trace_id,
-                },
-                502,
-            )
-        except Exception as exc:  # noqa: BLE001
-            elapsed = time.perf_counter() - started
-            stage = _error_stage(exc)
-            _record_request_http(ok=False, elapsed_s=elapsed, stage=stage)
-            logger.error(
-                "nl2sql_query_failed",
-                exc_info=True,
-                extra={
-                    "nl2sql": {
-                        "event": "nl2sql_query_failed",
-                        "trace_id": trace_id,
-                        "question": question,
-                        "error": str(exc),
-                    },
-                },
-            )
-            return jsonify({"error": str(exc), "trace_id": trace_id}), 400
-        elapsed = time.perf_counter() - started
-        _record_request_http(ok=True, elapsed_s=elapsed, stage="execution")
-        latency_ms = int(elapsed * 1000)
-        result["latency_ms"] = latency_ms
-        return jsonify(result)
+            return jsonify({"error": "question is required"}), 400
+        job_id = query_queue.enqueue(question)
+        return jsonify({"job_id": job_id, "status": "queued"}), 202
+
+    @app.get("/query/<job_id>")
+    def query_status(job_id: str) -> Response:
+        status = query_queue.get_status(job_id)
+        if status is None:
+            return jsonify({"error": "job not found", "job_id": job_id}), 404
+        return jsonify(status), 200
 
     return app
 

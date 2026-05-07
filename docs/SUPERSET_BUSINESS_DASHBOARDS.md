@@ -7,6 +7,7 @@
 | `techmart-business-overview` | Бизнес-обзор (RU) | KPI выручка / дней, линия продаж, bar валюта, Redis table+bar; при нехватке рядов — payment state / pie категорий | dbt marts + `dag_serving_optimizations` (Redis) |
 | `techmart-product-analytics` | Продуктовая аналитика (RU) | KPI каталог, pie категорий, table каталога, line/bar продаж, bar payment state, pie сегментов клиентов, bar доменов email | dbt marts |
 | `techmart-customer-sales-analysis` | Клиенты и продажи (RU) | KPI заказы/выручка, line заказов, bar payment, table заказов, area paid/unpaid, Redis bar, KPI клиентов / spend 90d, bar сегментов | dbt marts + serving |
+| `techmart-business-metrics-kpis` | Расширенные бизнес-метрики (RU) | Top-line KPI (GMV/Net Revenue/AOV), retention line (D1/D7/D30/D90), category revenue, unit-economics table, marketing coverage table | `dag_dbt_business_kpis_rest` (или `dag_dbt_marts_rest`) |
 | `techmart-finansy-hive-demo` | Финансы демо (RU) | KPI выручка RUB / заказы, линия RUB, bar по валюте, bar/pie mix заказов | `dag_spark_hive_finance_cbr_demo` после marts (SOAP ЦБ + JDBC в Postgres `demo_fin`; slug с «hive» — стабильность URL, **не** Apache Hive) |
 
 ## Демо финансов (`demo_fin`)

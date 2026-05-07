@@ -5,20 +5,71 @@ import re
 import sqlglot
 from sqlglot import exp
 
-ALLOWED_TABLES = frozenset({"hr_employees", "hr_departments", "hr_positions"})
+from nl2sql.schema_config import CANONICAL_TABLES, TABLE_ALIASES
+
+ALLOWED_TABLES = frozenset(CANONICAL_TABLES)
 BLOCKED_KEYWORDS = ("insert", "update", "delete", "drop", "alter", "truncate")
 
 
 def _extract_table_name(node: exp.Table) -> str:
-    if node.this is None:
+    table = str(node.this).lower().replace('"', "") if node.this is not None else ""
+    schema = str(node.db).lower().replace('"', "") if node.db is not None else ""
+    return f"{schema}.{table}" if schema and table else table
+
+
+def normalize_llm_sql(raw_sql: str) -> str:
+    text = (raw_sql or "").strip()
+    if not text:
         return ""
-    return str(node.this).lower()
+
+    fence = re.search(r"```(?:sql)?\s*(.*?)```", text, re.IGNORECASE | re.DOTALL)
+    if fence:
+        text = fence.group(1).strip()
+
+    text = re.sub(r"^\s*`+", "", text)
+    text = re.sub(r"`+\s*$", "", text)
+    text = re.sub(r"^\s*sql\b[:\s-]*", "", text, flags=re.IGNORECASE)
+
+    select_match = re.search(r"\bselect\b", text, flags=re.IGNORECASE)
+    if select_match:
+        text = text[select_match.start() :].strip()
+
+    end_match = re.search(r";", text)
+    if end_match:
+        text = text[: end_match.start() + 1]
+
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def _qualify_allowed_tables(sql_text: str) -> str:
+    normalized = sql_text
+
+    for alias, target in TABLE_ALIASES.items():
+        normalized = re.sub(
+            rf"(?<!\.)\b{re.escape(alias)}\b",
+            target,
+            normalized,
+            flags=re.IGNORECASE,
+        )
+
+    for table in ALLOWED_TABLES:
+        short = table.split(".")[-1]
+        normalized = re.sub(
+            rf"(?<!\.)\b{re.escape(short)}\b",
+            table,
+            normalized,
+            flags=re.IGNORECASE,
+        )
+
+    return normalized
 
 
 def validate_sql(sql: str) -> str:
-    sql_clean = sql.strip().rstrip(";")
+    sql_clean = normalize_llm_sql(sql).rstrip(";")
     if not sql_clean:
         raise ValueError("empty SQL generated")
+    sql_clean = _qualify_allowed_tables(sql_clean)
     lowered = sql_clean.lower()
     if any(word in lowered for word in BLOCKED_KEYWORDS):
         raise ValueError("forbidden SQL statement detected")

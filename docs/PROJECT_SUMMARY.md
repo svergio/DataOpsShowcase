@@ -51,6 +51,7 @@
 - **Ingestion**: сравнение сырого слоя с генератором (Kafka, MinIO, OLTP).
 - **Пайплайн end-to-end**: прогон цепочки Airflow, проверка `meta.pipeline_*` и витрин.
 - **dbt**: `staging` → `vault` → `marts`, тесты и `dbt docs generate`, статический сайт **dbt Docs** по префиксу `/dbt/` (см. [WEB_UI_ACCESS.md](WEB_UI_ACCESS.md)).
+- **Business KPI marts**: `mart_daily_business_kpis`, `mart_cohort_retention`, `mart_user_rfm`, `mart_category_performance`, `mart_marketing_channel`, `mart_unit_economics`; запуск DAG `dag_dbt_business_kpis_rest`.
 - **Data Vault**: согласованность ссылок hub/link/sat, SCD2.
 - **ML**: обучение из DAG, чтение MLflow, сверка с `ml/training/`.
 - **Наблюдаемость**: логи, метрики, Grafana.

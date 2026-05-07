@@ -120,3 +120,118 @@ models:
         tests:
           - not_null
           - dqc_non_negative_column: {}
+
+  - name: mart_daily_business_kpis
+    description: "Daily top-line KPI mart: GMV, net revenue, orders, AOV, buyers and new/repeat split."
+    config:
+      tags: ['marts', 'business_kpis']
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: ['metric_date', 'currency']
+    columns:
+      - name: metric_date
+        tests: [not_null]
+      - name: currency
+        tests: [not_null]
+      - name: orders_count
+        tests: [not_null]
+      - name: buyers_count
+        tests: [not_null]
+      - name: gmv
+        tests:
+          - not_null
+          - dqc_non_negative_column: {}
+      - name: net_revenue
+        tests:
+          - not_null
+          - dqc_non_negative_column: {}
+
+  - name: mart_cohort_retention
+    description: "Retention mart by first-order cohort month and activity date."
+    config:
+      tags: ['marts', 'business_kpis']
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: ['cohort_month', 'activity_date']
+    columns:
+      - name: cohort_month
+        tests: [not_null]
+      - name: activity_date
+        tests: [not_null]
+      - name: days_since_first_order
+        tests: [not_null]
+      - name: active_users
+        tests: [not_null]
+      - name: cohort_size
+        tests: [not_null]
+
+  - name: mart_user_rfm
+    description: "Customer-level frequency and LTV windows (30/90/180/365 days)."
+    config:
+      tags: ['marts', 'business_kpis']
+    columns:
+      - name: customer_hub_key
+        tests: [not_null, unique]
+      - name: first_order_date
+        tests: [not_null]
+      - name: last_order_date
+        tests: [not_null]
+      - name: orders_total
+        tests: [not_null]
+      - name: revenue_total
+        tests:
+          - not_null
+          - dqc_non_negative_column: {}
+
+  - name: mart_category_performance
+    description: "Category and seller daily performance from order-product bridge."
+    config:
+      tags: ['marts', 'business_kpis']
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: ['metric_date', 'category', 'seller_bk']
+    columns:
+      - name: metric_date
+        tests: [not_null]
+      - name: category
+        tests: [not_null]
+      - name: seller_bk
+        tests: [not_null]
+      - name: gross_revenue
+        tests:
+          - not_null
+          - dqc_non_negative_column: {}
+
+  - name: mart_marketing_channel
+    description: "Channel-level campaign budget mart (attribution-ready structure with placeholder KPIs)."
+    config:
+      tags: ['marts', 'business_kpis']
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: ['metric_date', 'channel']
+    columns:
+      - name: metric_date
+        tests: [not_null]
+      - name: channel
+        tests: [not_null]
+      - name: campaigns_count
+        tests: [not_null]
+      - name: planned_budget
+        tests:
+          - not_null
+          - dqc_non_negative_column: {}
+
+  - name: mart_unit_economics
+    description: "Cohort-level LTV rollup with explicit placeholders for CAC/ROAS-dependent metrics."
+    config:
+      tags: ['marts', 'business_kpis']
+    columns:
+      - name: cohort_month
+        tests: [not_null, unique]
+      - name: customers_count
+        tests: [not_null]
+      - name: avg_ltv_30d
+      - name: avg_ltv_90d
+      - name: avg_ltv_180d
+      - name: avg_ltv_365d
+      - name: limitations_note

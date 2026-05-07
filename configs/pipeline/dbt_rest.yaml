@@ -58,6 +58,15 @@ runs:
     target: dwh
     fail_on_test_failure: true
 
+  business_kpis:
+    dag_id: dag_dbt_business_kpis_rest
+    job_name: dataops_business_kpis
+    command: build --select tag:business_kpis+
+    selectors:
+      - "tag:business_kpis"
+    target: dwh
+    fail_on_test_failure: true
+
   docs:
     dag_id: dag_dbt_marts_rest
     job_name: dataops_docs

@@ -18,6 +18,7 @@ DB_NAME = os.getenv("TECHMART_SUPERSET_DATABASE_LABEL", "TechMart DWH")
 SLUG_BUSINESS_OVERVIEW = "techmart-business-overview"
 SLUG_PRODUCT_ANALYTICS = "techmart-product-analytics"
 SLUG_CUSTOMER_SALES = "techmart-customer-sales-analysis"
+SLUG_BUSINESS_METRICS = "techmart-business-metrics-kpis"
 SLUG_FINANCE_DEMO = "techmart-finansy-hive-demo"
 
 FINANCE_DEMO_SCHEMA = "demo_fin"
@@ -27,6 +28,12 @@ DATASET_TABLES: tuple[str, ...] = (
     "dim_products",
     "fct_orders",
     "fct_daily_sales",
+    "mart_daily_business_kpis",
+    "mart_cohort_retention",
+    "mart_user_rfm",
+    "mart_category_performance",
+    "mart_marketing_channel",
+    "mart_unit_economics",
     "redis_serving_snapshot",
 )
 
@@ -39,6 +46,12 @@ MAIN_DTTM: dict[str, str] = {
     "dim_customers": "registered_at",
     "fct_daily_sales": "order_date",
     "fct_orders": "order_ts",
+    "mart_daily_business_kpis": "metric_date",
+    "mart_cohort_retention": "activity_date",
+    "mart_user_rfm": "last_order_date",
+    "mart_category_performance": "metric_date",
+    "mart_marketing_channel": "metric_date",
+    "mart_unit_economics": "cohort_month",
     "redis_serving_snapshot": "updated_at",
     "mart_daily_finance_rub": "order_date",
     "mart_order_mix_rub": "order_date",
@@ -984,6 +997,211 @@ def _bootstrap_inner() -> None:
         24,
         cs_layouts,
         cs_builders,
+    )
+
+    bm_intro = _intro_block(
+        "Бизнес-метрики TechMart",
+        "<p>Top-line, retention, unit economics, category performance и marketing coverage "
+        "по витринам <code>dwh_marts.mart_*</code>.</p>",
+        SLUG_BUSINESS_METRICS,
+    )
+    bm_layouts: list[ChartLayout] = []
+    bm_builders: list[Callable[[], None]] = []
+
+    if "mart_daily_business_kpis" in reg:
+        i = reg["mart_daily_business_kpis"]
+        bm_layouts.append(
+            ChartLayout(
+                rid("BM", "r1"),
+                (
+                    (rid("BM", "c1a"), "RU_BM_KPI_GMV", 28, 4),
+                    (rid("BM", "c1b"), "RU_BM_KPI_Net_Revenue", 28, 4),
+                    (rid("BM", "c1c"), "RU_BM_KPI_Orders", 28, 4),
+                ),
+            )
+        )
+        bm_builders.append(
+            lambda i=i: ensure_chart_slice(owner, "RU_BM_KPI_GMV", "big_number_total", i, {"metric": "sum__gmv"})
+        )
+        bm_builders.append(
+            lambda i=i: ensure_chart_slice(
+                owner, "RU_BM_KPI_Net_Revenue", "big_number_total", i, {"metric": "sum__net_revenue"}
+            )
+        )
+        bm_builders.append(
+            lambda i=i: ensure_chart_slice(
+                owner, "RU_BM_KPI_Orders", "big_number_total", i, {"metric": "sum__orders_count"}
+            )
+        )
+        bm_layouts.append(
+            ChartLayout(
+                rid("BM", "r2"),
+                ((rid("BM", "c2"), "RU_BM_Line_GMV_and_Net_Revenue", 48, 12),),
+            )
+        )
+        bm_builders.append(
+            lambda i=i: ensure_chart_slice(
+                owner,
+                "RU_BM_Line_GMV_and_Net_Revenue",
+                "echarts_timeseries_line",
+                i,
+                {
+                    "time_range": "No filter",
+                    "row_limit": 100000,
+                    "granularity_sqla": "metric_date",
+                    "metrics": ["sum__gmv", "sum__net_revenue"],
+                },
+            )
+        )
+        bm_layouts.append(
+            ChartLayout(
+                rid("BM", "r3"),
+                ((rid("BM", "c3"), "RU_BM_Table_Daily_Topline", 48, 12),),
+            )
+        )
+        bm_builders.append(
+            lambda i=i: ensure_chart_slice(
+                owner,
+                "RU_BM_Table_Daily_Topline",
+                "table",
+                i,
+                {
+                    "row_limit": 200,
+                    "order_by_cols": [["metric_date", False]],
+                    "all_columns": [
+                        "metric_date",
+                        "currency",
+                        "orders_count",
+                        "buyers_count",
+                        "new_buyers_count",
+                        "repeat_buyers_count",
+                        "aov",
+                        "gmv",
+                        "net_revenue",
+                    ],
+                },
+            )
+        )
+
+    if "mart_cohort_retention" in reg:
+        i = reg["mart_cohort_retention"]
+        bm_layouts.append(
+            ChartLayout(
+                rid("BM", "r4"),
+                ((rid("BM", "c4"), "RU_BM_Line_Retention_Rate", 42, 12),),
+            )
+        )
+        bm_builders.append(
+            lambda i=i: ensure_chart_slice(
+                owner,
+                "RU_BM_Line_Retention_Rate",
+                "echarts_timeseries_line",
+                i,
+                {
+                    "time_range": "No filter",
+                    "row_limit": 100000,
+                    "granularity_sqla": "activity_date",
+                    "metrics": ["avg__retention_rate"],
+                },
+            )
+        )
+
+    if "mart_category_performance" in reg:
+        i = reg["mart_category_performance"]
+        bm_layouts.append(
+            ChartLayout(
+                rid("BM", "r5"),
+                ((rid("BM", "c5"), "RU_BM_Bar_Revenue_By_Category", 42, 12),),
+            )
+        )
+        bm_builders.append(
+            lambda i=i: ensure_chart_slice(
+                owner,
+                "RU_BM_Bar_Revenue_By_Category",
+                "bar",
+                i,
+                {"groupby": ["category"], "metrics": ["sum__gross_revenue"], "row_limit": 100},
+            )
+        )
+
+    if "mart_unit_economics" in reg:
+        i = reg["mart_unit_economics"]
+        bm_layouts.append(
+            ChartLayout(
+                rid("BM", "r6"),
+                ((rid("BM", "c6"), "RU_BM_Table_Unit_Economics", 46, 12),),
+            )
+        )
+        bm_builders.append(
+            lambda i=i: ensure_chart_slice(
+                owner,
+                "RU_BM_Table_Unit_Economics",
+                "table",
+                i,
+                {
+                    "row_limit": 120,
+                    "order_by_cols": [["cohort_month", False]],
+                    "all_columns": [
+                        "cohort_month",
+                        "customers_count",
+                        "avg_ltv_30d",
+                        "avg_ltv_90d",
+                        "avg_ltv_180d",
+                        "avg_ltv_365d",
+                        "avg_cac",
+                        "ltv_cac_ratio",
+                        "payback_months",
+                        "limitations_note",
+                    ],
+                },
+            )
+        )
+
+    if "mart_marketing_channel" in reg:
+        i = reg["mart_marketing_channel"]
+        bm_layouts.append(
+            ChartLayout(
+                rid("BM", "r7"),
+                ((rid("BM", "c7"), "RU_BM_Table_Marketing_Channel", 44, 12),),
+            )
+        )
+        bm_builders.append(
+            lambda i=i: ensure_chart_slice(
+                owner,
+                "RU_BM_Table_Marketing_Channel",
+                "table",
+                i,
+                {
+                    "row_limit": 200,
+                    "order_by_cols": [["metric_date", False]],
+                    "all_columns": [
+                        "metric_date",
+                        "channel",
+                        "campaigns_count",
+                        "active_campaigns_count",
+                        "planned_budget",
+                        "roas",
+                        "conversion_rate",
+                    ],
+                },
+            )
+        )
+
+    if not bm_layouts:
+        bm_intro = _intro_block(
+            "Бизнес-метрики TechMart",
+            "<p><b>Витрины бизнес-метрик не готовы.</b> Запустите "
+            "<code>dag_dbt_business_kpis_rest</code> или <code>dag_dbt_marts_rest</code> и повторите bootstrap.</p>",
+            SLUG_BUSINESS_METRICS,
+        )
+
+    ensure_dashboard_with_charts(
+        SLUG_BUSINESS_METRICS,
+        "Бизнес-метрики TechMart",
+        bm_intro,
+        24,
+        bm_layouts,
+        bm_builders,
     )
 
     reg_fin: dict[str, int] = {}

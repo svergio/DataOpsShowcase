@@ -24,6 +24,7 @@ flowchart TB
     SUP[superset]
     JUP[jupyterhub]
     NRD[node_red]
+    NL2SQL[nl2sql_app]
     PRUI[prometheus]
     PGWUI[pushgateway]
     SM[spark_master]
@@ -52,6 +53,10 @@ flowchart TB
     MINIO["minio: S3 + UI console"]
   end
 
+  subgraph ObsLayer [Наблюдаемость]
+    CADV[cadvisor]
+  end
+
   Dev --> ING
   ING --> PORT
   ING --> AFWEB
@@ -60,6 +65,7 @@ flowchart TB
   ING --> SUP
   ING --> JUP
   ING --> NRD
+  ING --> NL2SQL
   ING --> PRUI
   ING --> PGWUI
   ING --> MINIO
@@ -89,6 +95,7 @@ flowchart TB
   MLF --> PGMETA
   MLF --> MINIO
   GRAF --> PRUI
+  PRUI --> CADV
   PGWUI -.->|push метрик| PRUI
 
   PORT -.->|read-only docker.sock| DOCKER_HOST[Docker Engine]
@@ -113,6 +120,8 @@ flowchart TB
 - **dbt-rest** не публикует порт на хост: только `dbt-rest:8580` внутри compose. Вызовы — из Airflow и внешних клиентов в сети. **dbt Docs** за ingress — только чтение смонтированного **`dbt/target/`** (тот же каталог, что использует CLI-контейнер `dbt` и **dbt-rest** при прогонах).
 - **CDC / Atlas:** в корневом compose; маршруты `/schema-registry/`, `/kafka-connect/`, `/atlas/` — см. [`ARCHITECTURE_CDC.md`](../ARCHITECTURE_CDC.md), [`ARCHITECTURE_ATLAS.md`](../ARCHITECTURE_ATLAS.md).
 - **Node-RED:** за ingress `/node-red/`; учётные данные в `.env` (`NODE_RED_ADMIN_*`).
+- **NL2SQL:** сервис `nl2sql_app` публикуется за ingress как `/nl2sql/`, модель и health зависят от MLflow.
+- **cAdvisor:** не пользовательский UI за ingress, но ключевой источник контейнерных метрик для `prometheus`/`grafana`.
 
 ## См. также
 

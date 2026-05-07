@@ -6,7 +6,7 @@
     <title>NL2SQL HR</title>
     <link
       rel="stylesheet"
-      href="{{ url_for('static', filename='css/app.css', v=asset_version) }}"
+      href="static/css/app.css?v={{ asset_version }}"
     />
     <script src="https://d3js.org/d3.v7.min.js"></script>
   </head>
@@ -66,6 +66,31 @@
             ></textarea>
             <button type="submit" class="btn-send">Отправить</button>
           </form>
+          <div class="task-box" aria-live="polite">
+            <p class="panel-sub">Текущая задача</p>
+            <div id="task-meta" class="task-meta">Нет активной задачи</div>
+            <div id="task-flow" class="task-flow" role="img" aria-label="Схема этапов задачи NL2SQL"></div>
+            <ul id="task-stages" class="task-stages task-stages--fallback sr-only">
+              <li data-stage="queued">В очереди</li>
+              <li data-stage="processing">Выполняется</li>
+              <li data-stage="model_load">Загрузка модели</li>
+              <li data-stage="rag_retrieval">RAG по схеме</li>
+              <li data-stage="sql_generation">Генерация SQL</li>
+              <li data-stage="sql_validation">Валидация SQL</li>
+              <li data-stage="sql_execution">Выполнение SQL</li>
+              <li data-stage="done">Выполнено</li>
+              <li data-stage="error">Ошибка</li>
+            </ul>
+          </div>
+          <div id="queue-status" class="queue-status" aria-live="polite"></div>
+          <div class="queue-box" aria-live="polite">
+            <div class="queue-box-head">
+              <p class="panel-sub">Очередь запросов</p>
+            </div>
+            <ul id="queue-list" class="queue-list">
+              <li class="queue-empty">Очередь пуста</li>
+            </ul>
+          </div>
         </section>
 
         <section class="panel">
@@ -79,6 +104,6 @@
         </section>
       </div>
     </div>
-    <script src="{{ url_for('static', filename='js/app.js', v=asset_version) }}"></script>
+    <script src="static/js/app.js?v={{ asset_version }}"></script>
   </body>
 </html>

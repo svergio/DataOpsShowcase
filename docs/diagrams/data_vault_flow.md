@@ -15,11 +15,13 @@ flowchart TB
   subgraph sources [Источники]
     O[OLTP]
     K[Kafka]
+    KX[Kafka extensions]
     M[MinIO]
   end
 
   subgraph raw [Слой raw / landing в БД]
     R[Таблицы raw / extracts]
+    RX[raw.kafka_extension_events]
   end
 
   subgraph spark [Spark]
@@ -47,8 +49,12 @@ flowchart TB
 
   O --> R
   K --> R
+  KX --> RX
   M --> R
   R --> SP --> STG
+  RX --> H
+  RX --> L
+  RX --> S
   STG --> H
   STG --> L
   H --> S
@@ -62,7 +68,7 @@ flowchart TB
 | Слой | Схемы (из `dbt_project`) | Назначение |
 |------|--------------------------|------------|
 | Staging | `dwh_staging`, views | Нормализация имён, типов, единый `record_source` |
-| Vault raw | `dwh_vault` (hubs, links, satellites) | **Raw Data Vault**: бизнес-ключи, связи, история в саттелитах |
+| Vault raw | `dwh_vault` (hubs, links, satellites) | **Raw Data Vault**: бизнес-ключи, связи, история в саттелитах; часть сущностей может приходить напрямую из `raw.kafka_extension_events` |
 | Vault business | `dwh_bdv` (pit, bridge, business_satellites) | **Business DV**: срезы во времени, мосты, PIT |
 | Marts | `dwh_marts` | Витрины для BI и downstream |
 | Serving | `dwh_serving` | Узкие таблицы «под продукт»/экспорт |
@@ -70,6 +76,7 @@ flowchart TB
 ## Ключи расширений (Generators / OLTP)
 
 - [../DV2_ENTITY_KEYS.md](../DV2_ENTITY_KEYS.md) — канон бизнес-ключей для маркетинга, SEO, HR, GL и Kafka extension-событий.
+- Ветка `Kafka extensions -> raw.kafka_extension_events -> dwh_vault` отражает фактический запуск `dag_ingest_kafka_extensions_to_raw` и dataset-зависимость `dag_dbt_vault_rest` (см. [../PIPELINES.md](../PIPELINES.md)).
 
 ## См. также
 

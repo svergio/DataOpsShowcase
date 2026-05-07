@@ -4,8 +4,8 @@
 
 | Файл | Содержание |
 |------|------------|
-| [overview.md](overview.md) | Что такое песочница, зачем, что эмулируется |
-| [use_cases.md](use_cases.md) | 10 прикладных бизнес-сценариев |
+| [overview.md](overview.md) | Что такое песочница, зачем, что эмулируется, и как устроен «фантомный бизнес» |
+| [use_cases.md](use_cases.md) | Бизнес + операционные use-cases с KPI и acceptance criteria (target state) |
 | [value.md](value.md) | Ценность: идеи, моделирование, обучение, демо |
 | [platform_value.md](platform_value.md) | Бизнес-смысл Atlas, портала ingress и связь с каналом в мессенджере (инвестор / СД) |
 

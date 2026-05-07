@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from typing import Any
+from typing import Any, Callable
 
 import mlflow
 import pandas as pd
@@ -158,7 +158,11 @@ class NL2SQLService:
         *,
         debug: bool = False,
         trace_id: str = "",
+        stage_callback: Callable[[str], None] | None = None,
     ) -> dict[str, Any]:
+        if stage_callback is not None:
+            stage_callback("model_load")
+        self.llm._ensure_pyfunc_loaded()
         if not self.model_ready():
             err = getattr(self.llm, "load_error", None)
             raise RuntimeError(
@@ -168,6 +172,8 @@ class NL2SQLService:
             )
         total_started = time.perf_counter()
         rag_started = time.perf_counter()
+        if stage_callback is not None:
+            stage_callback("rag_retrieval")
         context_docs, rag_scores, retrieved_tables = self.rag_search(question)
         context_text = "\n".join(context_docs)
         rag_latency_ms = int((time.perf_counter() - rag_started) * 1000)
@@ -200,6 +206,8 @@ class NL2SQLService:
             sql = None
             for val_attempt in range(1, MAX_VALIDATION_ATTEMPTS + 1):
                 gen_started = time.perf_counter()
+                if stage_callback is not None:
+                    stage_callback("sql_generation")
                 log_nl2sql_stage(
                     trace_id,
                     "sql_generation",
@@ -216,6 +224,8 @@ class NL2SQLService:
                     "sql_validation",
                     raw_sql_preview=raw_sql.strip()[:200],
                 )
+                if stage_callback is not None:
+                    stage_callback("sql_validation")
                 try:
                     sql = validate_sql(raw_sql)
                     validation_result = "ok"
@@ -256,6 +266,8 @@ class NL2SQLService:
             assert sql is not None
 
             exec_started = time.perf_counter()
+            if stage_callback is not None:
+                stage_callback("sql_execution")
             log_nl2sql_stage(trace_id, "sql_execution", sql_preview=sql[:500])
             try:
                 rows = self.db_client.run_select(sql)

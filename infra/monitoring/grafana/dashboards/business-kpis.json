@@ -5,13 +5,13 @@
     {
       "id": 1,
       "type": "stat",
-      "title": "Today Gross Sales",
+      "title": "Today GMV",
       "datasource": { "type": "postgres", "uid": "PGDWH" },
-      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 0 },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
       "targets": [
         {
           "format": "table",
-          "rawSql": "SELECT COALESCE(SUM(gross_sales),0)::double precision AS value FROM dwh_marts.fct_daily_sales WHERE order_date = CURRENT_DATE;",
+          "rawSql": "SELECT COALESCE(SUM(gmv),0)::double precision AS value FROM dwh_marts.mart_daily_business_kpis WHERE metric_date = CURRENT_DATE;",
           "refId": "A"
         }
       ]
@@ -19,13 +19,13 @@
     {
       "id": 2,
       "type": "stat",
-      "title": "Orders (30d)",
+      "title": "Net Revenue (30d)",
       "datasource": { "type": "postgres", "uid": "PGDWH" },
-      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 0 },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
       "targets": [
         {
           "format": "table",
-          "rawSql": "SELECT COUNT(*)::double precision AS value FROM dwh_marts.fct_orders WHERE order_date >= CURRENT_DATE - INTERVAL '30 day';",
+          "rawSql": "SELECT COALESCE(SUM(net_revenue),0)::double precision AS value FROM dwh_marts.mart_daily_business_kpis WHERE metric_date >= CURRENT_DATE - INTERVAL '30 day';",
           "refId": "A"
         }
       ]
@@ -33,27 +33,97 @@
     {
       "id": 3,
       "type": "stat",
-      "title": "Avg Order Value (30d)",
+      "title": "AOV (30d)",
       "datasource": { "type": "postgres", "uid": "PGDWH" },
-      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 0 },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
       "targets": [
         {
           "format": "table",
-          "rawSql": "SELECT COALESCE(AVG(total_amount),0)::double precision AS value FROM dwh_marts.fct_orders WHERE order_date >= CURRENT_DATE - INTERVAL '30 day';",
+          "rawSql": "SELECT CASE WHEN SUM(orders_count)=0 THEN 0 ELSE (SUM(gmv)/SUM(orders_count))::double precision END AS value FROM dwh_marts.mart_daily_business_kpis WHERE metric_date >= CURRENT_DATE - INTERVAL '30 day';",
           "refId": "A"
         }
       ]
     },
     {
       "id": 4,
-      "type": "timeseries",
-      "title": "Daily Sales Trend",
+      "type": "stat",
+      "title": "D30 Retention (avg)",
       "datasource": { "type": "postgres", "uid": "PGDWH" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 6 },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+      "targets": [
+        {
+          "format": "table",
+          "rawSql": "SELECT COALESCE(AVG(retention_rate),0)::double precision AS value FROM dwh_marts.mart_cohort_retention WHERE canonical_day_marker = 30 AND activity_date >= CURRENT_DATE - INTERVAL '90 day';",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "GMV and Net Revenue (60d)",
+      "datasource": { "type": "postgres", "uid": "PGDWH" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
       "targets": [
         {
           "format": "time_series",
-          "rawSql": "SELECT order_date::timestamp AS time, SUM(gross_sales)::double precision AS value FROM dwh_marts.fct_daily_sales WHERE order_date >= CURRENT_DATE - INTERVAL '30 day' GROUP BY 1 ORDER BY 1;",
+          "rawSql": "SELECT metric_date::timestamp AS time, SUM(gmv)::double precision AS gmv, SUM(net_revenue)::double precision AS net_revenue FROM dwh_marts.mart_daily_business_kpis WHERE metric_date >= CURRENT_DATE - INTERVAL '60 day' GROUP BY 1 ORDER BY 1;",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "New vs Repeat Buyers (60d)",
+      "datasource": { "type": "postgres", "uid": "PGDWH" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
+      "targets": [
+        {
+          "format": "time_series",
+          "rawSql": "SELECT metric_date::timestamp AS time, SUM(new_buyers_count)::double precision AS new_buyers, SUM(repeat_buyers_count)::double precision AS repeat_buyers FROM dwh_marts.mart_daily_business_kpis WHERE metric_date >= CURRENT_DATE - INTERVAL '60 day' GROUP BY 1 ORDER BY 1;",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "bargauge",
+      "title": "Top Categories by Revenue (30d)",
+      "datasource": { "type": "postgres", "uid": "PGDWH" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 13 },
+      "targets": [
+        {
+          "format": "table",
+          "rawSql": "SELECT category, SUM(gross_revenue)::double precision AS value FROM dwh_marts.mart_category_performance WHERE metric_date >= CURRENT_DATE - INTERVAL '30 day' GROUP BY 1 ORDER BY 2 DESC LIMIT 10;",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Marketing Planned Budget by Channel (90d)",
+      "datasource": { "type": "postgres", "uid": "PGDWH" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 13 },
+      "targets": [
+        {
+          "format": "time_series",
+          "rawSql": "SELECT metric_date::timestamp AS time, channel, SUM(planned_budget)::double precision AS value FROM dwh_marts.mart_marketing_channel WHERE metric_date >= CURRENT_DATE - INTERVAL '90 day' GROUP BY 1,2 ORDER BY 1;",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "Unit Economics by Cohort",
+      "datasource": { "type": "postgres", "uid": "PGDWH" },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 21 },
+      "targets": [
+        {
+          "format": "table",
+          "rawSql": "SELECT cohort_month, customers_count, avg_ltv_30d, avg_ltv_90d, avg_ltv_180d, avg_ltv_365d, avg_cac, ltv_cac_ratio, payback_months, limitations_note FROM dwh_marts.mart_unit_economics ORDER BY cohort_month DESC LIMIT 24;",
           "refId": "A"
         }
       ]
@@ -61,10 +131,10 @@
   ],
   "refresh": "1m",
   "schemaVersion": 39,
-  "tags": ["kpi", "business"],
+  "tags": ["kpi", "business", "retention", "unit-economics"],
   "templating": { "list": [] },
-  "time": { "from": "now-30d", "to": "now" },
+  "time": { "from": "now-90d", "to": "now" },
   "title": "Business KPIs",
   "uid": "business-kpis",
-  "version": 1
+  "version": 2
 }

@@ -285,6 +285,8 @@
 |----------|------------|
 | [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) | Стек и поток данных |
 | [PIPELINES.md](PIPELINES.md) | Текущие DAG |
+| [GAPS_AND_PRODUCTION_READINESS.md](GAPS_AND_PRODUCTION_READINESS.md) | Явные разрывы до production-ready и приоритеты |
+| [FAQ.md](FAQ.md) | Короткие ответы для бизнеса и инженеров |
 | [business/value.md](business/value.md) | Ценность песочницы |
 | [business/platform_value.md](business/platform_value.md) | Atlas, портал, мессенджер для инвестора (бизнес-смысл) |
 
