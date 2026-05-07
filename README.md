@@ -27,6 +27,20 @@
 
 Код и конфиги: `pipelines/` (Airflow), `dbt/`, `spark/`, `services/` (портал, dbt-rest, nl2sql и др.), `configs/`, `infra/` (nginx, мониторинг).
 
+## Architecture + Tools (rollout)
+
+Базовый стенд остается в `docker-compose.yml`, а новые инструменты подключаются как **additive overlays** из `infrastructure/` с profile-gating.
+
+| Профиль | Файл | Назначение | Ключевая команда |
+|---------|------|------------|------------------|
+| `core` | `docker-compose.yml` | Базовая платформа (ингресс, DWH, Airflow, dbt, Grafana, Superset и т.д.) | `make up-lite` |
+| `vault` | `infrastructure/vault/docker-compose.vault.yml` | Secrets management (dev bootstrap, policy scaffolding) | `make vault-init` |
+| `lakefs` | `infrastructure/lakefs/docker-compose.lakefs.yml` | Branching/rollback для data lake слоев | `make lakefs-setup` |
+| `datahub` | `infrastructure/datahub/docker-compose.datahub.yml` | Metadata catalog dual-run миграция | `make datahub-ingest` |
+| `argocd` | `infrastructure/argocd/docker-compose.argocd.yml` | GitOps control plane и promotion flow | `make gitops-sync` |
+
+Полный подъем (core + tooling profiles): `make up`.
+
 ## Документация
 
 Полный указатель — **[docs/README.md](docs/README.md)**. Отдельно полезны [PIPELINES.md](docs/PIPELINES.md), [SUPERSET.md](docs/SUPERSET.md), [docs/ML.md](docs/ML.md) (в т.ч. **NL2SQL** за `/nl2sql/`), [services/nl2sql_app/README.md](services/nl2sql_app/README.md), [API.md](docs/API.md), материалы для нетехнических читателей — [docs/business/](docs/business/), диаграммы — [docs/diagrams/](docs/diagrams/).

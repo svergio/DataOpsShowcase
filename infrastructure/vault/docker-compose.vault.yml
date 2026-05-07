@@ -1,0 +1,33 @@
+services:
+  vault:
+    image: hashicorp/vault:1.17
+    container_name: dataops_vault
+    restart: unless-stopped
+    profiles: ["vault"]
+    cap_add:
+      - IPC_LOCK
+    ports:
+      - "${VAULT_PORT:-8200}:8200"
+    environment:
+      VAULT_ADDR: "http://0.0.0.0:8200"
+      VAULT_API_ADDR: "http://vault:8200"
+      VAULT_LOCAL_CONFIG: ""
+    command: ["vault", "server", "-config=/vault/config/vault.hcl"]
+    volumes:
+      - ./infrastructure/vault/config/vault.hcl:/vault/config/vault.hcl:ro
+      - ./infrastructure/vault/policies:/vault/policies:ro
+      - vault_data:/vault/file
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8200/v1/sys/health"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+    networks:
+      - dataops_net
+
+volumes:
+  vault_data:
+
+networks:
+  dataops_net:
+    external: true

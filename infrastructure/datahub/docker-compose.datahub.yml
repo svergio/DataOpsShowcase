@@ -1,0 +1,124 @@
+services:
+  datahub-db-init:
+    image: postgres:${POSTGRES_IMAGE_TAG:-16-alpine}
+    container_name: datahub_db_init
+    restart: "no"
+    profiles: ["datahub"]
+    environment:
+      PGPASSWORD: "${PG_META_PASSWORD:-meta_pass}"
+    command:
+      - sh
+      - -c
+      - |
+        psql -h postgres_metadb -U ${PG_META_USER:-meta_user} -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='datahub'" | grep -q 1 || \
+        psql -h postgres_metadb -U ${PG_META_USER:-meta_user} -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE datahub;"
+    depends_on:
+      postgres_metadb:
+        condition: service_healthy
+    networks:
+      - dataops_net
+
+  datahub-elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.14.3
+    container_name: datahub_elasticsearch
+    restart: unless-stopped
+    profiles: ["datahub"]
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "${DATAHUB_ES_PORT:-9200}:9200"
+    volumes:
+      - datahub_elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - dataops_net
+
+  datahub-kafka-setup:
+    image: acryldata/datahub-kafka-setup:v0.14.1
+    container_name: datahub_kafka_setup
+    restart: "no"
+    profiles: ["datahub"]
+    environment:
+      DATAHUB_PRECREATE_TOPICS: "true"
+      KAFKA_BOOTSTRAP_SERVER: "kafka:29092"
+      USE_CONFLUENT_SCHEMA_REGISTRY: "true"
+      SCHEMA_REGISTRY_URL: "http://schema_registry:8081"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      schema_registry:
+        condition: service_healthy
+    networks:
+      - dataops_net
+
+  datahub-gms:
+    image: acryldata/datahub-gms:v0.14.1
+    container_name: datahub_gms
+    restart: unless-stopped
+    profiles: ["datahub"]
+    environment:
+      EBEAN_DATASOURCE_USERNAME: "${PG_META_USER:-meta_user}"
+      EBEAN_DATASOURCE_PASSWORD: "${PG_META_PASSWORD:-meta_pass}"
+      EBEAN_DATASOURCE_HOST: "postgres_metadb:5432"
+      EBEAN_DATASOURCE_URL: "jdbc:postgresql://postgres_metadb:5432/datahub"
+      KAFKA_BOOTSTRAP_SERVER: "kafka:29092"
+      ELASTICSEARCH_HOST: "datahub-elasticsearch"
+      ELASTICSEARCH_PORT: "9200"
+    ports:
+      - "${DATAHUB_GMS_PORT:-8080}:8080"
+    depends_on:
+      postgres_metadb:
+        condition: service_healthy
+      datahub-db-init:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
+      datahub-elasticsearch:
+        condition: service_started
+      datahub-kafka-setup:
+        condition: service_completed_successfully
+    networks:
+      - dataops_net
+
+  datahub-frontend:
+    image: acryldata/datahub-frontend-react:v0.14.1
+    container_name: datahub_frontend
+    restart: unless-stopped
+    profiles: ["datahub"]
+    environment:
+      DATAHUB_GMS_HOST: datahub-gms
+      DATAHUB_GMS_PORT: 8080
+      REACT_APP_DATAHUB_ANALYTICS_ENABLED: "false"
+      AUTH_ENABLED: "false"
+    ports:
+      - "${DATAHUB_PORT:-9002}:9002"
+    depends_on:
+      datahub-gms:
+        condition: service_started
+    networks:
+      - dataops_net
+
+  datahub-actions:
+    image: acryldata/datahub-actions:v0.0.14
+    container_name: datahub_actions
+    restart: unless-stopped
+    profiles: ["datahub"]
+    environment:
+      ACTIONS_CONFIG: /etc/datahub/actions.yaml
+      DATAHUB_GMS_HOST: datahub-gms
+      DATAHUB_GMS_PORT: 8080
+      KAFKA_BOOTSTRAP_SERVER: kafka:29092
+      KAFKA_SCHEMAREGISTRY_URL: http://schema_registry:8081
+    depends_on:
+      datahub-gms:
+        condition: service_started
+    networks:
+      - dataops_net
+
+volumes:
+  datahub_elasticsearch_data:
+
+networks:
+  dataops_net:
+    external: true

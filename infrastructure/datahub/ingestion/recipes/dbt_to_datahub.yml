@@ -1,0 +1,14 @@
+source:
+  type: dbt
+  config:
+    manifest_path: /workspace/dbt/target/manifest.json
+    catalog_path: /workspace/dbt/target/catalog.json
+    target_platform: postgres
+    load_schemas: true
+    include_column_lineage: true
+    env: DEV
+
+sink:
+  type: datahub-rest
+  config:
+    server: http://datahub-gms:8080

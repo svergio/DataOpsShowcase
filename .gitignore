@@ -45,3 +45,5 @@ temp/
 *.parquet
 *.csv
 *.sqlite
+infrastructure/vault/.vault-root-token
+infrastructure/vault/.vault-unseal-keys.json

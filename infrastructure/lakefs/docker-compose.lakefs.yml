@@ -1,0 +1,56 @@
+services:
+  lakefs-db-init:
+    image: postgres:${POSTGRES_IMAGE_TAG:-16-alpine}
+    container_name: dataops_lakefs_db_init
+    restart: "no"
+    profiles: ["lakefs"]
+    environment:
+      PGPASSWORD: "${PG_META_PASSWORD:-meta_pass}"
+    command:
+      - sh
+      - -c
+      - |
+        psql -h postgres_metadb -U ${PG_META_USER:-meta_user} -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='lakefs'" | grep -q 1 || \
+        psql -h postgres_metadb -U ${PG_META_USER:-meta_user} -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE lakefs;"
+    depends_on:
+      postgres_metadb:
+        condition: service_healthy
+    networks:
+      - dataops_net
+
+  lakefs:
+    image: treeverse/lakefs:1.36.0
+    container_name: dataops_lakefs
+    restart: unless-stopped
+    profiles: ["lakefs"]
+    ports:
+      - "${LAKEFS_PORT:-8008}:8000"
+    environment:
+      LAKEFS_DATABASE_TYPE: postgres
+      LAKEFS_DATABASE_POSTGRES_CONNECTION_STRING: "postgres://${PG_META_USER:-meta_user}:${PG_META_PASSWORD:-meta_pass}@postgres_metadb:5432/lakefs?sslmode=disable"
+      LAKEFS_AUTH_ENCRYPT_SECRET_KEY: "${LAKEFS_AUTH_ENCRYPT_SECRET_KEY:-change-this-lakefs-secret-key-32}"
+      LAKEFS_BLOCKSTORE_TYPE: s3
+      LAKEFS_BLOCKSTORE_S3_ENDPOINT: "http://minio:9000"
+      LAKEFS_BLOCKSTORE_S3_FORCE_PATH_STYLE: "true"
+      LAKEFS_BLOCKSTORE_S3_CREDENTIALS_ACCESS_KEY_ID: "${MINIO_ROOT_USER:-minioadmin}"
+      LAKEFS_BLOCKSTORE_S3_CREDENTIALS_SECRET_ACCESS_KEY: "${MINIO_ROOT_PASSWORD:-minioadmin}"
+      LAKEFS_BLOCKSTORE_S3_REGION: "${MINIO_REGION:-us-east-1}"
+      LAKEFS_LOGGING_LEVEL: INFO
+    depends_on:
+      postgres_metadb:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      lakefs-db-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8000/_health"]
+      interval: 20s
+      timeout: 10s
+      retries: 8
+    networks:
+      - dataops_net
+
+networks:
+  dataops_net:
+    external: true

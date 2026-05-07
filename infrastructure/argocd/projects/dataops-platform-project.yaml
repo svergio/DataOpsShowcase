@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: dataops-platform
+  namespace: argocd
+spec:
+  description: DataOps core and tooling project
+  sourceRepos:
+    - https://github.com/example-org/dataops-showcase.git
+  destinations:
+    - namespace: dataops
+      server: https://kubernetes.default.svc
+    - namespace: dataops-tools
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"

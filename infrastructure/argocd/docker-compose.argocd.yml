@@ -1,0 +1,28 @@
+services:
+  argocd-server:
+    image: quay.io/argoproj/argocd:v2.13.2
+    container_name: dataops_argocd
+    restart: unless-stopped
+    profiles: ["argocd"]
+    command: ["argocd-server", "--insecure", "--staticassets", "/shared/app"]
+    ports:
+      - "${ARGOCD_PORT:-8088}:8080"
+    volumes:
+      - argocd_data:/home/argocd
+      - ./infrastructure/argocd/values:/app/config/local
+      - ./infrastructure/argocd/apps:/workspace/apps:ro
+      - ./infrastructure/argocd/projects:/workspace/projects:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/healthz"]
+      interval: 20s
+      timeout: 10s
+      retries: 6
+    networks:
+      - dataops_net
+
+volumes:
+  argocd_data:
+
+networks:
+  dataops_net:
+    external: true

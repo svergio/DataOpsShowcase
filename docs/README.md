@@ -17,6 +17,11 @@
 | [SUPERSET_BUSINESS_DASHBOARDS.md](SUPERSET_BUSINESS_DASHBOARDS.md) | Описание бизнес-дашбордов по slug |
 | [BUSINESS_METRICS.md](BUSINESS_METRICS.md) | Словарь бизнес-метрик и матрица покрытия данных (`ready/partial/gap`) |
 | [runbook/SUPERSET_EMPTY_DASHBOARDS_ELT.md](runbook/SUPERSET_EMPTY_DASHBOARDS_ELT.md) | Пустые дашборды: цепочка ELT и OLAP |
+| [runbook/TOOLING_BASELINE_AUDIT.md](runbook/TOOLING_BASELINE_AUDIT.md) | Базовый аудит и точки интеграции rollout tooling |
+| [runbook/VAULT_OPERATIONS.md](runbook/VAULT_OPERATIONS.md) | Инициализация, policy bootstrap и операции Vault |
+| [runbook/LAKEFS_BRANCHING_AND_ROLLBACK.md](runbook/LAKEFS_BRANCHING_AND_ROLLBACK.md) | Branching модель и rollback в lakeFS |
+| [runbook/DATAHUB_INGESTION_AND_RBAC.md](runbook/DATAHUB_INGESTION_AND_RBAC.md) | Ingestion recipes и RBAC guidance для DataHub |
+| [runbook/ARGOCD_PROMOTION_FLOW.md](runbook/ARGOCD_PROMOTION_FLOW.md) | Promotion и rollback flow в ArgoCD |
 | [TESTING_AND_DATA_QUALITY.md](TESTING_AND_DATA_QUALITY.md) | Pytest, dbt tests, DQ, `scripts/run_dqc.sh` |
 | [OBSERVABILITY_AND_LOGGING.md](OBSERVABILITY_AND_LOGGING.md) | Grafana, Prometheus, метаданные прогонов |
 | [QUALITY_AND_MONITORING.md](QUALITY_AND_MONITORING.md) | Короткий индекс качества и наблюдаемости |
@@ -25,6 +30,7 @@
 | [Roadmap.md](Roadmap.md) | Дорожная карта: идеи ETL/ML, приоритеты |
 | [GAPS_AND_PRODUCTION_READINESS.md](GAPS_AND_PRODUCTION_READINESS.md) | Приоритизированные gap'ы до production-ready состояния |
 | [FAQ.md](FAQ.md) | Короткие ответы для стейкхолдеров и инженеров |
+| [TOOLING_ROLLOUT_CHECKLIST.md](TOOLING_ROLLOUT_CHECKLIST.md) | Чек-лист rollout по Vault/lakeFS/DataHub/ArgoCD |
 
 ## Скрипты проверки (хост)
 
@@ -32,6 +38,10 @@
 |--------|------------|
 | [`../scripts/ingress_smoke.sh`](../scripts/ingress_smoke.sh) | Быстрый `curl` к порталу, `/superset/health`, `/nl2sql/health`, `/prometheus/-/healthy` через ingress (`INGRESS_BASE_URL` / `INGRESS_PORT`) |
 | [`../scripts/run_dqc.sh`](../scripts/run_dqc.sh) | Прогон dbt DQ (см. TESTING_AND_DATA_QUALITY) |
+| [`../infrastructure/vault/scripts/bootstrap-vault.sh`](../infrastructure/vault/scripts/bootstrap-vault.sh) | Dev bootstrap для Vault |
+| [`../infrastructure/lakefs/scripts/bootstrap-lakefs.sh`](../infrastructure/lakefs/scripts/bootstrap-lakefs.sh) | Первичная настройка lakeFS repository/branch |
+| [`../infrastructure/datahub/scripts/run-ingestion.sh`](../infrastructure/datahub/scripts/run-ingestion.sh) | Запуск DataHub ingestion recipes |
+| [`../infrastructure/argocd/scripts/gitops-sync.sh`](../infrastructure/argocd/scripts/gitops-sync.sh) | Принудительный sync ArgoCD приложения |
 
 ## Материалы для бизнеса
 
